@@ -1,0 +1,35 @@
+version: "3.8"
+
+services:
+  pstn-simulator:
+    build:
+      context: ./src/PstnSimulator
+      dockerfile: Dockerfile
+    container_name: pstn-simulator
+    ports:
+      - "5200:8080"
+    environment:
+      # ─── Simulator Mode ────────────────────────────────
+      # "Mock" = fake ACS REST API (no Azure needed)
+      # "Live" = real ACS SDK calls (requires connection string)
+      - AcsMode=${ACS_MODE:-Mock}
+
+      # ─── Live Mode Only ────────────────────────────────
+      - AcsConnectionString=${ACS_CONNECTION_STRING:-}
+      - AcsCallerNumber=${ACS_CALLER_NUMBER:-}
+
+      # ─── IVR Endpoint ──────────────────────────────────
+      # Where the simulator sends EventGrid events.
+      # Use "host.docker.internal" for IVR running on host,
+      # or the container name if on the same Docker network.
+      - IvrEndpoint=${IVR_ENDPOINT:-http://host.docker.internal:7071}
+
+    networks:
+      - ivr-network
+    restart: unless-stopped
+
+networks:
+  ivr-network:
+    # Set external: true if the IVR docker-compose already created this network
+    # Run: docker network create ivr-network
+    external: false

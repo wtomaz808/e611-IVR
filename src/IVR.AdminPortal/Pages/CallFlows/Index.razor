@@ -1,0 +1,367 @@
+@page "/call-flows"
+@using IVR.Core.Interfaces
+@using IVR.Core.Models
+@inject ICosmosDbService CosmosDb
+
+<PageTitle>Call Flows — IVR Admin</PageTitle>
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h3><i class="bi bi-diagram-3 me-2"></i>Call Flow Builder</h3>
+    <button class="btn btn-primary" @onclick="ShowCreateDialog">
+        <i class="bi bi-plus-lg me-1"></i>New Menu
+    </button>
+</div>
+
+<!-- Menu Tree View -->
+<div class="row g-4">
+    <div class="col-md-4">
+        <div class="card border-0 shadow-sm">
+            <div class="card-header bg-white">
+                <h6 class="mb-0">Menu Tree</h6>
+            </div>
+            <div class="card-body">
+                @if (_menus.Any())
+                {
+                    <div class="list-group list-group-flush">
+                        @foreach (var menu in _rootMenus)
+                        {
+                            <div class="list-group-item list-group-item-action @(_selectedMenu?.Id == menu.Id ? "active" : "")"
+                                @onclick="() => SelectMenu(menu)" role="button">
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <div>
+                                        <i class="bi bi-house-door me-1"></i>
+                                        <strong>@menu.Name</strong>
+                                        @if (menu.IsRootMenu)
+                                        {
+                                            <span class="badge bg-warning ms-1">Root</span>
+                                        }
+                                    </div>
+                                    <span class="badge @(menu.IsActive ? "bg-success" : "bg-secondary")">
+                                        @(menu.IsActive ? "Active" : "Inactive")
+                                    </span>
+                                </div>
+                            </div>
+
+                            @foreach (var child in GetChildMenus(menu.Id))
+                            {
+                                <div class="list-group-item list-group-item-action ps-4 @(_selectedMenu?.Id == child.Id ? "active" : "")"
+                                    @onclick="() => SelectMenu(child)" role="button">
+                                    <i class="bi bi-arrow-return-right me-1"></i>
+                                    @child.Name
+                                </div>
+
+                                @foreach (var grandchild in GetChildMenus(child.Id))
+                                {
+                                    <div class="list-group-item list-group-item-action ps-5 @(_selectedMenu?.Id == grandchild.Id ? "active" : "")"
+                                        @onclick="() => SelectMenu(grandchild)" role="button">
+                                        <i class="bi bi-arrow-return-right me-1"></i>
+                                        @grandchild.Name
+                                    </div>
+                                }
+                            }
+                        }
+                    </div>
+                }
+                else
+                {
+                    <p class="text-muted text-center py-4">No menus configured.<br />Create your first menu to get started.</p>
+                }
+            </div>
+        </div>
+    </div>
+
+    <!-- Menu Detail / Editor -->
+    <div class="col-md-8">
+        @if (_selectedMenu != null)
+        {
+            <div class="card border-0 shadow-sm">
+                <div class="card-header bg-white d-flex justify-content-between align-items-center">
+                    <h6 class="mb-0">@_selectedMenu.Name</h6>
+                    <div>
+                        <button class="btn btn-sm btn-outline-primary me-1" @onclick="() => EditMenu(_selectedMenu)">
+                            <i class="bi bi-pencil me-1"></i>Edit
+                        </button>
+                        <button class="btn btn-sm btn-outline-danger" @onclick="() => DeleteMenu(_selectedMenu)">
+                            <i class="bi bi-trash me-1"></i>Delete
+                        </button>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <div class="row g-3 mb-4">
+                        <div class="col-md-4">
+                            <small class="text-muted">Type</small>
+                            <div><span class="badge bg-primary">@_selectedMenu.MenuType</span></div>
+                        </div>
+                        <div class="col-md-4">
+                            <small class="text-muted">Timeout</small>
+                            <div>@_selectedMenu.TimeoutSeconds seconds</div>
+                        </div>
+                        <div class="col-md-4">
+                            <small class="text-muted">Max Retries</small>
+                            <div>@_selectedMenu.MaxRetries</div>
+                        </div>
+                    </div>
+
+                    <h6>Menu Options</h6>
+                    <div class="table-responsive">
+                        <table class="table table-sm">
+                            <thead>
+                                <tr>
+                                    <th>Key</th>
+                                    <th>Label</th>
+                                    <th>Action</th>
+                                    <th>Target</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var option in _selectedMenu.Options)
+                                {
+                                    <tr>
+                                        <td><kbd>@option.DtmfKey</kbd></td>
+                                        <td>@option.Label</td>
+                                        <td><span class="badge bg-info">@option.Action.Type</span></td>
+                                        <td>
+                                            @if (option.Action.TargetMenuId != null)
+                                            {
+                                                var targetMenu = _menus.FirstOrDefault(m => m.Id == option.Action.TargetMenuId);
+                                                <span>@(targetMenu?.Name ?? option.Action.TargetMenuId)</span>
+                                            }
+                                            else if (option.Action.TransferNumber != null)
+                                            {
+                                                <code>@option.Action.TransferNumber</code>
+                                            }
+                                            else
+                                            {
+                                                <span class="text-muted">—</span>
+                                            }
+                                        </td>
+                                    </tr>
+                                }
+                                @if (!_selectedMenu.Options.Any())
+                                {
+                                    <tr><td colspan="4" class="text-muted text-center">No options configured</td></tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+
+                    @if (_selectedMenu.Conditions.Any())
+                    {
+                        <h6 class="mt-3">Routing Conditions</h6>
+                        @foreach (var condition in _selectedMenu.Conditions)
+                        {
+                            <div class="alert alert-info py-2">
+                                <i class="bi bi-funnel me-1"></i>
+                                If <strong>@condition.Type</strong> @condition.Operator <code>@condition.Value</code>
+                                → Route to @(condition.TargetMenuId ?? "custom action")
+                            </div>
+                        }
+                    }
+                </div>
+            </div>
+        }
+        else
+        {
+            <div class="card border-0 shadow-sm">
+                <div class="card-body text-center text-muted py-5">
+                    <i class="bi bi-diagram-3 fs-1 d-block mb-3"></i>
+                    Select a menu from the tree to view its details, or create a new one.
+                </div>
+            </div>
+        }
+    </div>
+</div>
+
+<!-- Create/Edit Modal -->
+@if (_showModal)
+{
+    <div class="modal show d-block" style="background-color: rgba(0,0,0,0.5);">
+        <div class="modal-dialog modal-xl">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">@(_editingMenu.Id == null ? "Create Menu" : "Edit Menu")</h5>
+                    <button type="button" class="btn-close" @onclick="CloseModal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="row g-3">
+                        <div class="col-md-4">
+                            <label class="form-label">Name</label>
+                            <input type="text" class="form-control" @bind="_editingMenu.Name" />
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Type</label>
+                            <select class="form-select" @bind="_editingMenu.MenuType">
+                                @foreach (var mt in Enum.GetValues<MenuType>())
+                                {
+                                    <option value="@mt">@mt</option>
+                                }
+                            </select>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Parent Menu</label>
+                            <select class="form-select" @bind="_editingMenu.ParentMenuId">
+                                <option value="">— None (Root Level) —</option>
+                                @foreach (var m in _menus.Where(m => m.Id != _editingMenu.Id))
+                                {
+                                    <option value="@m.Id">@m.Name</option>
+                                }
+                            </select>
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label">Description</label>
+                            <input type="text" class="form-control" @bind="_editingMenu.Description" />
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Prompt ID</label>
+                            <input type="text" class="form-control" @bind="_editingMenu.PromptId" />
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Timeout (seconds)</label>
+                            <input type="number" class="form-control" @bind="_editingMenu.TimeoutSeconds" />
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Max Retries</label>
+                            <input type="number" class="form-control" @bind="_editingMenu.MaxRetries" />
+                        </div>
+
+                        <!-- Menu Options Editor -->
+                        <div class="col-12 mt-4">
+                            <div class="d-flex justify-content-between align-items-center mb-2">
+                                <h6>Menu Options</h6>
+                                <button class="btn btn-sm btn-outline-primary" @onclick="AddOption">
+                                    <i class="bi bi-plus"></i> Add Option
+                                </button>
+                            </div>
+
+                            @for (int i = 0; i < _editingMenu.Options.Count; i++)
+                            {
+                                var idx = i;
+                                var option = _editingMenu.Options[idx];
+                                <div class="card mb-2">
+                                    <div class="card-body py-2">
+                                        <div class="row g-2 align-items-end">
+                                            <div class="col-md-1">
+                                                <label class="form-label small">Key</label>
+                                                <input type="text" class="form-control form-control-sm"
+                                                    @bind="option.DtmfKey" maxlength="1" />
+                                            </div>
+                                            <div class="col-md-3">
+                                                <label class="form-label small">Label</label>
+                                                <input type="text" class="form-control form-control-sm"
+                                                    @bind="option.Label" />
+                                            </div>
+                                            <div class="col-md-2">
+                                                <label class="form-label small">Action</label>
+                                                <select class="form-select form-select-sm"
+                                                    @bind="option.Action.Type">
+                                                    @foreach (var at in Enum.GetValues<ActionType>())
+                                                    {
+                                                        <option value="@at">@at</option>
+                                                    }
+                                                </select>
+                                            </div>
+                                            <div class="col-md-3">
+                                                <label class="form-label small">Target</label>
+                                                <input type="text" class="form-control form-control-sm"
+                                                    @bind="option.Action.TargetMenuId"
+                                                    placeholder="Menu ID or Number" />
+                                            </div>
+                                            <div class="col-md-2">
+                                                <label class="form-label small">Keywords</label>
+                                                <input type="text" class="form-control form-control-sm"
+                                                    placeholder="comma-separated" />
+                                            </div>
+                                            <div class="col-md-1">
+                                                <button class="btn btn-sm btn-outline-danger"
+                                                    @onclick="() => RemoveOption(idx)">
+                                                    <i class="bi bi-x"></i>
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            }
+                        </div>
+
+                        <div class="col-12">
+                            <div class="form-check me-3 d-inline-block">
+                                <input class="form-check-input" type="checkbox" @bind="_editingMenu.IsActive" />
+                                <label class="form-check-label">Active</label>
+                            </div>
+                            <div class="form-check d-inline-block">
+                                <input class="form-check-input" type="checkbox" @bind="_editingMenu.IsRootMenu" />
+                                <label class="form-check-label">Root Menu</label>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" @onclick="CloseModal">Cancel</button>
+                    <button type="button" class="btn btn-primary" @onclick="SaveMenu">
+                        <i class="bi bi-check-lg me-1"></i>Save
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    private List<IvrMenu> _menus = new();
+    private IvrMenu? _selectedMenu;
+    private IvrMenu _editingMenu = new();
+    private bool _showModal = false;
+
+    private IEnumerable<IvrMenu> _rootMenus =>
+        _menus.Where(m => string.IsNullOrEmpty(m.ParentMenuId)).OrderBy(m => m.Order);
+
+    protected override async Task OnInitializedAsync()
+    {
+        _menus = await CosmosDb.GetAllMenusAsync();
+    }
+
+    private IEnumerable<IvrMenu> GetChildMenus(string parentId) =>
+        _menus.Where(m => m.ParentMenuId == parentId).OrderBy(m => m.Order);
+
+    private void SelectMenu(IvrMenu menu) => _selectedMenu = menu;
+
+    private void ShowCreateDialog()
+    {
+        _editingMenu = new IvrMenu();
+        _showModal = true;
+    }
+
+    private void EditMenu(IvrMenu menu)
+    {
+        _editingMenu = menu;
+        _showModal = true;
+    }
+
+    private void CloseModal() => _showModal = false;
+
+    private void AddOption()
+    {
+        _editingMenu.Options.Add(new MenuOption
+        {
+            DtmfKey = (_editingMenu.Options.Count + 1).ToString(),
+            Action = new MenuAction()
+        });
+    }
+
+    private void RemoveOption(int index) => _editingMenu.Options.RemoveAt(index);
+
+    private async Task SaveMenu()
+    {
+        await CosmosDb.UpsertMenuAsync(_editingMenu);
+        _menus = await CosmosDb.GetAllMenusAsync();
+        _selectedMenu = _menus.FirstOrDefault(m => m.Id == _editingMenu.Id);
+        _showModal = false;
+    }
+
+    private async Task DeleteMenu(IvrMenu menu)
+    {
+        await CosmosDb.DeleteMenuAsync(menu.Id);
+        _menus = await CosmosDb.GetAllMenusAsync();
+        _selectedMenu = null;
+    }
+}

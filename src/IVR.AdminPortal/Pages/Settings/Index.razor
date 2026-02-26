@@ -1,0 +1,289 @@
+@page "/settings"
+@page "/settings/business-hours"
+@using IVR.Core.Interfaces
+@using IVR.Core.Models
+@inject ICosmosDbService CosmosDb
+
+<PageTitle>Settings — IVR Admin</PageTitle>
+
+<h3 class="mb-4"><i class="bi bi-gear me-2"></i>Settings</h3>
+
+<ul class="nav nav-tabs mb-4">
+    <li class="nav-item">
+        <button class="nav-link @(_tab == "general" ? "active" : "")" @onclick='() => _tab = "general"'>
+            General
+        </button>
+    </li>
+    <li class="nav-item">
+        <button class="nav-link @(_tab == "hours" ? "active" : "")" @onclick='() => _tab = "hours"'>
+            Business Hours
+        </button>
+    </li>
+    <li class="nav-item">
+        <button class="nav-link @(_tab == "holidays" ? "active" : "")" @onclick='() => _tab = "holidays"'>
+            Holidays
+        </button>
+    </li>
+</ul>
+
+@if (_tab == "general" && _systemConfig != null)
+{
+    <div class="card border-0 shadow-sm">
+        <div class="card-body">
+            <h5 class="card-title">System Configuration</h5>
+            <div class="row g-3">
+                <div class="col-md-4">
+                    <label class="form-label">Default Language</label>
+                    <select class="form-select" @bind="_systemConfig.DefaultLanguage">
+                        <option value="en-US">English (US)</option>
+                        <option value="es-ES">Spanish</option>
+                        <option value="fr-FR">French</option>
+                    </select>
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label">Default TTS Voice</label>
+                    <select class="form-select" @bind="_systemConfig.DefaultTtsVoice">
+                        <option value="en-US-JennyNeural">Jenny (Female)</option>
+                        <option value="en-US-GuyNeural">Guy (Male)</option>
+                        <option value="en-US-AriaNeural">Aria (Female)</option>
+                    </select>
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label">Max Call Duration (min)</label>
+                    <input type="number" class="form-control" @bind="_systemConfig.MaxCallDurationMinutes" />
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label">Global Timeout (sec)</label>
+                    <input type="number" class="form-control" @bind="_systemConfig.GlobalTimeoutSeconds" />
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label">Max Retries</label>
+                    <input type="number" class="form-control" @bind="_systemConfig.GlobalMaxRetries" />
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label">Root Menu ID</label>
+                    <input type="text" class="form-control" @bind="_systemConfig.RootMenuId" />
+                </div>
+                <div class="col-12">
+                    <div class="form-check me-3 d-inline-block">
+                        <input class="form-check-input" type="checkbox" @bind="_systemConfig.RecordCalls" />
+                        <label class="form-check-label">Record Calls</label>
+                    </div>
+                    <div class="form-check d-inline-block">
+                        <input class="form-check-input" type="checkbox" @bind="_systemConfig.EnableSpeechRecognition" />
+                        <label class="form-check-label">Enable Speech Recognition</label>
+                    </div>
+                </div>
+
+                @* ─── Avaya CM10 Integration ─────────────────────────── *@
+                <div class="col-12 mt-4">
+                    <h6><i class="bi bi-telephone-forward me-1"></i>Avaya CM10 Integration</h6>
+                    <hr class="mt-1" />
+                </div>
+                <div class="col-md-4">
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" @bind="_systemConfig.EnableDisconnectTransferToVdn" />
+                        <label class="form-check-label">Transfer to VDN on Disconnect</label>
+                    </div>
+                    <small class="text-muted">When enabled, caller disconnects are forwarded to the CM10 VDN for ACD routing.</small>
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label">Default CM10 VDN</label>
+                    <input type="text" class="form-control" @bind="_systemConfig.DefaultCm10Vdn"
+                        placeholder="sip:70100@sbc.contoso.com or +18005550100" />
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label">CM10 SBC FQDN</label>
+                    <input type="text" class="form-control" @bind="_systemConfig.Cm10SbcFqdn"
+                        placeholder="sbc.contoso.com (optional)" />
+                    <small class="text-muted">Falls back to Default SBC FQDN if empty.</small>
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label">CM10 SBC Port</label>
+                    <input type="number" class="form-control" @bind="_systemConfig.Cm10SbcPort"
+                        placeholder="Default: same as SBC port" />
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label">Transfer Prompt ID</label>
+                    <input type="text" class="form-control" @bind="_systemConfig.Cm10TransferPromptId"
+                        placeholder="Optional pre-transfer prompt" />
+                </div>
+
+                <div class="col-12">
+                    <button class="btn btn-primary" @onclick="SaveSystemConfig">
+                        <i class="bi bi-check-lg me-1"></i>Save Settings
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+else if (_tab == "hours" && _businessHours != null)
+{
+    <div class="card border-0 shadow-sm">
+        <div class="card-body">
+            <h5 class="card-title">Business Hours</h5>
+            <div class="row g-3 mb-3">
+                <div class="col-md-4">
+                    <label class="form-label">Timezone</label>
+                    <select class="form-select" @bind="_businessHours.Timezone">
+                        <option value="America/New_York">Eastern (ET)</option>
+                        <option value="America/Chicago">Central (CT)</option>
+                        <option value="America/Denver">Mountain (MT)</option>
+                        <option value="America/Los_Angeles">Pacific (PT)</option>
+                    </select>
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label">After-Hours Menu ID</label>
+                    <input type="text" class="form-control" @bind="_businessHours.AfterHoursMenuId" />
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label">Holiday Menu ID</label>
+                    <input type="text" class="form-control" @bind="_businessHours.HolidayMenuId" />
+                </div>
+            </div>
+
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>Day</th>
+                        <th>Open</th>
+                        <th>Open Time</th>
+                        <th>Close Time</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var day in Enum.GetValues<DayOfWeek>())
+                    {
+                        if (!_businessHours.Schedule.ContainsKey(day))
+                            _businessHours.Schedule[day] = new DaySchedule();
+
+                        var schedule = _businessHours.Schedule[day];
+                        <tr>
+                            <td><strong>@day</strong></td>
+                            <td>
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" @bind="schedule.IsOpen" />
+                                </div>
+                            </td>
+                            <td>
+                                <input type="time" class="form-control form-control-sm"
+                                    value="@schedule.OpenTime"
+                                    @onchange="e => schedule.OpenTime = e.Value?.ToString()"
+                                    disabled="@(!schedule.IsOpen)" style="width: 120px;" />
+                            </td>
+                            <td>
+                                <input type="time" class="form-control form-control-sm"
+                                    value="@schedule.CloseTime"
+                                    @onchange="e => schedule.CloseTime = e.Value?.ToString()"
+                                    disabled="@(!schedule.IsOpen)" style="width: 120px;" />
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+
+            <button class="btn btn-primary" @onclick="SaveBusinessHours">
+                <i class="bi bi-check-lg me-1"></i>Save Business Hours
+            </button>
+        </div>
+    </div>
+}
+else if (_tab == "holidays" && _businessHours != null)
+{
+    <div class="card border-0 shadow-sm">
+        <div class="card-body">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <h5 class="card-title mb-0">Holidays</h5>
+                <button class="btn btn-sm btn-primary" @onclick="AddHoliday">
+                    <i class="bi bi-plus me-1"></i>Add Holiday
+                </button>
+            </div>
+
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>Date</th>
+                        <th>Name</th>
+                        <th>Use Holiday Menu</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @for (int i = 0; i < _businessHours.Holidays.Count; i++)
+                    {
+                        var idx = i;
+                        var holiday = _businessHours.Holidays[idx];
+                        <tr>
+                            <td><input type="date" class="form-control form-control-sm" @bind="holiday.Date" style="width: 160px;" /></td>
+                            <td><input type="text" class="form-control form-control-sm" @bind="holiday.Name" /></td>
+                            <td>
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" @bind="holiday.UseHolidayMenu" />
+                                </div>
+                            </td>
+                            <td>
+                                <button class="btn btn-sm btn-outline-danger" @onclick="() => RemoveHoliday(idx)">
+                                    <i class="bi bi-trash"></i>
+                                </button>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+
+            <button class="btn btn-primary" @onclick="SaveBusinessHours">
+                <i class="bi bi-check-lg me-1"></i>Save Holidays
+            </button>
+        </div>
+    </div>
+}
+
+@if (_saveMessage != null)
+{
+    <div class="alert alert-success mt-3 alert-dismissible">
+        <i class="bi bi-check-circle me-1"></i>@_saveMessage
+        <button type="button" class="btn-close" @onclick='() => _saveMessage = null'></button>
+    </div>
+}
+
+@code {
+    private string _tab = "general";
+    private SystemConfig? _systemConfig;
+    private BusinessHoursConfig? _businessHours;
+    private string? _saveMessage;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _systemConfig = await CosmosDb.GetSystemConfigAsync();
+        _businessHours = await CosmosDb.GetBusinessHoursAsync() ?? new BusinessHoursConfig();
+    }
+
+    private async Task SaveSystemConfig()
+    {
+        if (_systemConfig != null)
+        {
+            await CosmosDb.UpsertSystemConfigAsync(_systemConfig);
+            _saveMessage = "System settings saved successfully.";
+        }
+    }
+
+    private async Task SaveBusinessHours()
+    {
+        if (_businessHours != null)
+        {
+            await CosmosDb.UpsertBusinessHoursAsync(_businessHours);
+            _saveMessage = "Business hours saved successfully.";
+        }
+    }
+
+    private void AddHoliday()
+    {
+        _businessHours?.Holidays.Add(new Holiday { Date = DateTime.Today, Name = "New Holiday" });
+    }
+
+    private void RemoveHoliday(int index)
+    {
+        _businessHours?.Holidays.RemoveAt(index);
+    }
+}

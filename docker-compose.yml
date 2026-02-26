@@ -1,0 +1,102 @@
+# ─────────────────────────────────────────────────────────────────
+# IVR System — Docker Compose
+# ─────────────────────────────────────────────────────────────────
+#
+# Usage:
+#   cp .env.example .env        # fill in secrets
+#   docker compose up --build   # build & run all services
+#
+# For local development with the Azurite storage emulator and
+# Cosmos DB emulator, set USE_EMULATORS=true in your .env file.
+# ─────────────────────────────────────────────────────────────────
+
+services:
+
+  # ── IVR Functions (Azure Functions v4 Isolated) ──────────────
+  ivr-functions:
+    build:
+      context: ./src
+      dockerfile: IVR.Functions/Dockerfile
+    container_name: ivr-functions
+    ports:
+      - "7071:80"
+    environment:
+      - AzureWebJobsStorage=${AZURE_WEBJOBS_STORAGE:-UseDevelopmentStorage=true;DevelopmentStorageProxyUri=http://azurite}
+      - FUNCTIONS_WORKER_RUNTIME=dotnet-isolated
+      - AcsConnectionString=${ACS_CONNECTION_STRING:-}
+      - CosmosDbConnectionString=${COSMOS_DB_CONNECTION_STRING:-}
+      - StorageConnectionString=${STORAGE_CONNECTION_STRING:-}
+      - CallbackBaseUrl=${CALLBACK_BASE_URL:-http://ivr-functions:80}
+      - MockAcsEndpoint=http://pstn-simulator:8080
+      - CognitiveServicesEndpoint=${COGNITIVE_SERVICES_ENDPOINT:-}
+      - CognitiveServicesKey=${COGNITIVE_SERVICES_KEY:-}
+      - AzureOpenAI__Endpoint=${AZURE_OPENAI_ENDPOINT:-}
+      - AzureOpenAI__ApiKey=${AZURE_OPENAI_API_KEY:-}
+      - AzureOpenAI__DeploymentName=${AZURE_OPENAI_DEPLOYMENT:-gpt-4o}
+      - APPLICATIONINSIGHTS_CONNECTION_STRING=${APPINSIGHTS_CONNECTION_STRING:-}
+    depends_on:
+      azurite:
+        condition: service_started
+    networks:
+      - ivr-network
+    restart: unless-stopped
+
+  # ── Admin Portal (Blazor Server) ─────────────────────────────
+  ivr-admin:
+    build:
+      context: ./src
+      dockerfile: IVR.AdminPortal/Dockerfile
+    container_name: ivr-admin
+    ports:
+      - "8080:8080"
+    environment:
+      - ASPNETCORE_ENVIRONMENT=${ASPNETCORE_ENVIRONMENT:-Development}
+      - AzureAd__Instance=${AZURE_AD_INSTANCE:-https://login.microsoftonline.com/}
+      - AzureAd__TenantId=${AZURE_AD_TENANT_ID:-}
+      - AzureAd__ClientId=${AZURE_AD_CLIENT_ID:-}
+      - AzureAd__CallbackPath=/signin-oidc
+      - CosmosDbConnectionString=${COSMOS_DB_CONNECTION_STRING:-}
+      - StorageConnectionString=${STORAGE_CONNECTION_STRING:-}
+      - ApplicationInsights__ConnectionString=${APPINSIGHTS_CONNECTION_STRING:-}
+    networks:
+      - ivr-network
+    restart: unless-stopped
+
+  # ── PSTN Simulator (Blazor Server + Mock ACS) ───────────────
+  pstn-simulator:
+    build:
+      context: ./simulator/src/PstnSimulator
+      dockerfile: Dockerfile
+    container_name: pstn-simulator
+    ports:
+      - "5200:8080"
+    environment:
+      - AcsMode=${ACS_MODE:-Mock}
+      - AcsConnectionString=${ACS_CONNECTION_STRING:-}
+      - AcsCallerNumber=${ACS_CALLER_NUMBER:-}
+      - IvrEndpoint=http://ivr-functions:80
+    networks:
+      - ivr-network
+    restart: unless-stopped
+
+  # ── Azurite (Azure Storage Emulator) — local dev only ────────
+  azurite:
+    image: mcr.microsoft.com/azure-storage/azurite:latest
+    container_name: azurite
+    ports:
+      - "10000:10000"   # Blob
+      - "10001:10001"   # Queue
+      - "10002:10002"   # Table
+    volumes:
+      - azurite-data:/data
+    command: "azurite --blobHost 0.0.0.0 --queueHost 0.0.0.0 --tableHost 0.0.0.0 -l /data"
+    networks:
+      - ivr-network
+    restart: unless-stopped
+
+networks:
+  ivr-network:
+    driver: bridge
+
+volumes:
+  azurite-data:

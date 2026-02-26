@@ -1,0 +1,264 @@
+@page "/prompts"
+@using IVR.Core.Interfaces
+@using IVR.Core.Models
+@inject ICosmosDbService CosmosDb
+@inject IBlobStorageService BlobStorage
+
+<PageTitle>Prompts — IVR Admin</PageTitle>
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h3><i class="bi bi-megaphone me-2"></i>Prompt Management</h3>
+    <button class="btn btn-primary" @onclick="ShowCreateDialog">
+        <i class="bi bi-plus-lg me-1"></i>New Prompt
+    </button>
+</div>
+
+<!-- Search and Filter -->
+<div class="card border-0 shadow-sm mb-4">
+    <div class="card-body">
+        <div class="row g-3">
+            <div class="col-md-6">
+                <div class="input-group">
+                    <span class="input-group-text"><i class="bi bi-search"></i></span>
+                    <input type="text" class="form-control" placeholder="Search prompts..."
+                        @bind="_searchTerm" @bind:event="oninput" />
+                </div>
+            </div>
+            <div class="col-md-3">
+                <select class="form-select" @bind="_filterType">
+                    <option value="">All Types</option>
+                    <option value="Tts">Text-to-Speech</option>
+                    <option value="AudioFile">Audio File</option>
+                    <option value="Ssml">SSML</option>
+                </select>
+            </div>
+            <div class="col-md-3">
+                <select class="form-select" @bind="_filterStatus">
+                    <option value="">All Status</option>
+                    <option value="true">Active</option>
+                    <option value="false">Inactive</option>
+                </select>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Prompts List -->
+<div class="card border-0 shadow-sm">
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-hover mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th>Name</th>
+                        <th>Type</th>
+                        <th>Language</th>
+                        <th>Voice</th>
+                        <th>Status</th>
+                        <th>Updated</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var prompt in FilteredPrompts)
+                    {
+                        <tr>
+                            <td>
+                                <strong>@prompt.Name</strong>
+                                @if (!string.IsNullOrEmpty(prompt.Description))
+                                {
+                                    <br /><small class="text-muted">@prompt.Description</small>
+                                }
+                            </td>
+                            <td>
+                                <span class="badge @GetTypeBadge(prompt.Type)">@prompt.Type</span>
+                            </td>
+                            <td>@prompt.Language</td>
+                            <td><small>@prompt.TtsVoice</small></td>
+                            <td>
+                                @if (prompt.IsActive)
+                                {
+                                    <span class="badge bg-success">Active</span>
+                                }
+                                else
+                                {
+                                    <span class="badge bg-secondary">Inactive</span>
+                                }
+                            </td>
+                            <td><small>@prompt.UpdatedAt.ToString("MMM d, yyyy")</small></td>
+                            <td>
+                                <div class="btn-group btn-group-sm">
+                                    <button class="btn btn-outline-primary" @onclick="() => EditPrompt(prompt)"
+                                        title="Edit">
+                                        <i class="bi bi-pencil"></i>
+                                    </button>
+                                    @if (prompt.Type == PromptType.Tts)
+                                    {
+                                        <button class="btn btn-outline-success" @onclick="() => PreviewPrompt(prompt)"
+                                            title="Preview">
+                                            <i class="bi bi-play-circle"></i>
+                                        </button>
+                                    }
+                                    <button class="btn btn-outline-danger" @onclick="() => DeletePrompt(prompt)"
+                                        title="Delete">
+                                        <i class="bi bi-trash"></i>
+                                    </button>
+                                </div>
+                            </td>
+                        </tr>
+                    }
+                    @if (!FilteredPrompts.Any())
+                    {
+                        <tr>
+                            <td colspan="7" class="text-center text-muted py-4">No prompts found</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- Create/Edit Modal -->
+@if (_showModal)
+{
+    <div class="modal show d-block" style="background-color: rgba(0,0,0,0.5);">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">@(_editingPrompt.Id == null ? "Create Prompt" : "Edit Prompt")</h5>
+                    <button type="button" class="btn-close" @onclick="CloseModal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label class="form-label">Name</label>
+                            <input type="text" class="form-control" @bind="_editingPrompt.Name" />
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Type</label>
+                            <select class="form-select" @bind="_editingPrompt.Type">
+                                <option value="@PromptType.Tts">Text-to-Speech</option>
+                                <option value="@PromptType.AudioFile">Audio File</option>
+                                <option value="@PromptType.Ssml">SSML</option>
+                            </select>
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label">Description</label>
+                            <input type="text" class="form-control" @bind="_editingPrompt.Description" />
+                        </div>
+
+                        @if (_editingPrompt.Type == PromptType.Tts || _editingPrompt.Type == PromptType.Ssml)
+                        {
+                            <div class="col-12">
+                                <label class="form-label">
+                                    @(_editingPrompt.Type == PromptType.Ssml ? "SSML Content" : "TTS Text")
+                                </label>
+                                <textarea class="form-control" rows="4" @bind="_editingPrompt.TtsText"></textarea>
+                            </div>
+                        }
+
+                        <div class="col-md-4">
+                            <label class="form-label">Language</label>
+                            <select class="form-select" @bind="_editingPrompt.Language">
+                                <option value="en-US">English (US)</option>
+                                <option value="en-GB">English (UK)</option>
+                                <option value="es-ES">Spanish</option>
+                                <option value="fr-FR">French</option>
+                                <option value="de-DE">German</option>
+                            </select>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Voice</label>
+                            <select class="form-select" @bind="_editingPrompt.TtsVoice">
+                                <option value="en-US-JennyNeural">Jenny (Female)</option>
+                                <option value="en-US-GuyNeural">Guy (Male)</option>
+                                <option value="en-US-AriaNeural">Aria (Female)</option>
+                                <option value="en-US-DavisNeural">Davis (Male)</option>
+                                <option value="en-US-SaraNeural">Sara (Female)</option>
+                            </select>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Category</label>
+                            <input type="text" class="form-control" @bind="_editingPrompt.Category"
+                                placeholder="e.g., Welcome, Menu, Error" />
+                        </div>
+                        <div class="col-12">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" @bind="_editingPrompt.IsActive" />
+                                <label class="form-check-label">Active</label>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" @onclick="CloseModal">Cancel</button>
+                    <button type="button" class="btn btn-primary" @onclick="SavePrompt">
+                        <i class="bi bi-check-lg me-1"></i>Save
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    private List<IvrPrompt> _prompts = new();
+    private string _searchTerm = "";
+    private string _filterType = "";
+    private string _filterStatus = "";
+    private bool _showModal = false;
+    private IvrPrompt _editingPrompt = new();
+
+    private IEnumerable<IvrPrompt> FilteredPrompts => _prompts
+        .Where(p => string.IsNullOrEmpty(_searchTerm) ||
+            p.Name.Contains(_searchTerm, StringComparison.OrdinalIgnoreCase) ||
+            (p.TtsText?.Contains(_searchTerm, StringComparison.OrdinalIgnoreCase) ?? false))
+        .Where(p => string.IsNullOrEmpty(_filterType) || p.Type.ToString() == _filterType)
+        .Where(p => string.IsNullOrEmpty(_filterStatus) || p.IsActive.ToString().ToLower() == _filterStatus);
+
+    protected override async Task OnInitializedAsync()
+    {
+        _prompts = await CosmosDb.GetAllPromptsAsync();
+    }
+
+    private void ShowCreateDialog()
+    {
+        _editingPrompt = new IvrPrompt();
+        _showModal = true;
+    }
+
+    private void EditPrompt(IvrPrompt prompt)
+    {
+        _editingPrompt = prompt;
+        _showModal = true;
+    }
+
+    private void CloseModal() => _showModal = false;
+
+    private async Task SavePrompt()
+    {
+        await CosmosDb.UpsertPromptAsync(_editingPrompt);
+        _prompts = await CosmosDb.GetAllPromptsAsync();
+        _showModal = false;
+    }
+
+    private async Task DeletePrompt(IvrPrompt prompt)
+    {
+        await CosmosDb.DeletePromptAsync(prompt.Id);
+        _prompts = await CosmosDb.GetAllPromptsAsync();
+    }
+
+    private void PreviewPrompt(IvrPrompt prompt)
+    {
+        // In production, this would call Azure Cognitive Services TTS to generate audio preview
+    }
+
+    private static string GetTypeBadge(PromptType type) => type switch
+    {
+        PromptType.Tts => "bg-primary",
+        PromptType.AudioFile => "bg-success",
+        PromptType.Ssml => "bg-info",
+        _ => "bg-secondary"
+    };
+}

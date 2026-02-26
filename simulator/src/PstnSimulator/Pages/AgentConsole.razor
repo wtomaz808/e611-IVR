@@ -1,0 +1,197 @@
+@page "/agent-console"
+@using PstnSimulator.Models
+@using PstnSimulator.Services
+@inject Cm10Service Cm10
+@inject CallStateManager CallManager
+@implements IDisposable
+
+<h3 class="mb-3"><i class="bi bi-headset me-2"></i>Agent Console</h3>
+
+<div class="row">
+    @foreach (var agent in _agents)
+    {
+        var statusColor = agent.State switch
+        {
+            AgentState.Available => "border-success",
+            AgentState.Busy => "border-danger",
+            AgentState.OnBreak => "border-warning",
+            _ => "border-secondary"
+        };
+        var dotColor = agent.State switch
+        {
+            AgentState.Available => "status-available",
+            AgentState.Busy => "status-busy",
+            AgentState.OnBreak => "status-break",
+            _ => "status-offline"
+        };
+        var call = agent.CurrentCallId != null ? CallManager.GetCall(agent.CurrentCallId) : null;
+
+        <div class="col-md-4 col-lg-3 mb-3">
+            <div class="card bg-dark text-light agent-card @statusColor">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-start mb-2">
+                        <div>
+                            <h6 class="mb-0">
+                                <span class="status-dot @dotColor"></span>
+                                @agent.Name
+                            </h6>
+                            <small class="text-muted">Ext @agent.Extension</small>
+                        </div>
+                        <span class="badge @GetStateBadge(agent.State)">@agent.State</span>
+                    </div>
+
+                    @* Skills *@
+                    <div class="mb-2">
+                        @foreach (var skill in agent.Skills)
+                        {
+                            <span class="badge bg-secondary me-1">@skill</span>
+                        }
+                    </div>
+
+                    @* Stats *@
+                    <div class="mb-2 small text-muted">
+                        Calls handled: @agent.CallsHandled
+                    </div>
+
+                    @* Active Call Info *@
+                    @if (call != null)
+                    {
+                        <div class="alert alert-success py-1 px-2 mb-2 small">
+                            <i class="bi bi-telephone-fill me-1"></i>
+                            Connected: @call.CallerName (@call.CallerNumber)
+                        </div>
+                    }
+
+                    @* Agent Actions *@
+                    <div class="btn-group btn-group-sm w-100">
+                        <button class="btn btn-outline-success"
+                                @onclick="() => SetAgentState(agent.Id, AgentState.Available)"
+                                disabled="@(agent.State == AgentState.Available)">
+                            Available
+                        </button>
+                        <button class="btn btn-outline-warning"
+                                @onclick="() => SetAgentState(agent.Id, AgentState.OnBreak)"
+                                disabled="@(agent.State == AgentState.OnBreak || agent.State == AgentState.Busy)">
+                            Break
+                        </button>
+                        <button class="btn btn-outline-secondary"
+                                @onclick="() => SetAgentState(agent.Id, AgentState.Offline)"
+                                disabled="@(agent.State == AgentState.Offline || agent.State == AgentState.Busy)">
+                            Offline
+                        </button>
+                    </div>
+
+                    @* Release Call *@
+                    @if (agent.State == AgentState.Busy && call != null)
+                    {
+                        <button class="btn btn-outline-danger btn-sm w-100 mt-2"
+                                @onclick="() => ReleaseCall(agent.Id, call.Id)">
+                            <i class="bi bi-telephone-x me-1"></i> Release Call
+                        </button>
+                    }
+                </div>
+            </div>
+        </div>
+    }
+</div>
+
+@* ─── Queue Status ─── *@
+<h5 class="mt-4 mb-3"><i class="bi bi-collection me-2"></i>Queue Status</h5>
+<div class="row">
+    @foreach (var queue in Cm10.GetQueues())
+    {
+        var availableCount = queue.AgentIds.Count(id => _agents.Any(a => a.Id == id && a.State == AgentState.Available));
+        var busyCount = queue.AgentIds.Count(id => _agents.Any(a => a.Id == id && a.State == AgentState.Busy));
+        var totalCount = queue.AgentIds.Count;
+
+        <div class="col-md-6 mb-3">
+            <div class="card bg-dark text-light">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <span><i class="bi bi-people-fill me-1"></i> @queue.Name</span>
+                    <span class="badge bg-info">@queue.Strategy</span>
+                </div>
+                <div class="card-body">
+                    <div class="d-flex gap-3">
+                        <div class="text-center">
+                            <div class="fs-4 text-success">@availableCount</div>
+                            <small class="text-muted">Available</small>
+                        </div>
+                        <div class="text-center">
+                            <div class="fs-4 text-danger">@busyCount</div>
+                            <small class="text-muted">Busy</small>
+                        </div>
+                        <div class="text-center">
+                            <div class="fs-4 text-secondary">@(totalCount - availableCount - busyCount)</div>
+                            <small class="text-muted">Other</small>
+                        </div>
+                    </div>
+                    <div class="mt-2">
+                        <div class="progress" style="height: 6px;">
+                            @{
+                                var avPct = totalCount > 0 ? (availableCount * 100 / totalCount) : 0;
+                                var buPct = totalCount > 0 ? (busyCount * 100 / totalCount) : 0;
+                            }
+                            <div class="progress-bar bg-success" style="width: @avPct%"></div>
+                            <div class="progress-bar bg-danger" style="width: @buPct%"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    private List<SimulatedAgent> _agents = new();
+
+    protected override void OnInitialized()
+    {
+        _agents = Cm10.GetAgents().ToList();
+        CallManager.OnCallUpdated += HandleUpdate;
+        CallManager.OnCallCompleted += HandleComplete;
+    }
+
+    private void SetAgentState(string agentId, AgentState state)
+    {
+        var agent = _agents.FirstOrDefault(a => a.Id == agentId);
+        if (agent != null)
+        {
+            agent.State = state;
+            StateHasChanged();
+        }
+    }
+
+    private void ReleaseCall(string agentId, string callId)
+    {
+        Cm10.AgentReleased(agentId);
+        CallManager.CompleteCall(callId, CallState.Disconnected, CallEventSource.Agent, "Agent released the call");
+        _agents = Cm10.GetAgents().ToList();
+        StateHasChanged();
+    }
+
+    private void HandleUpdate(SimulatedCall _)
+    {
+        _agents = Cm10.GetAgents().ToList();
+        InvokeAsync(StateHasChanged);
+    }
+
+    private void HandleComplete(CallDetailRecord _)
+    {
+        _agents = Cm10.GetAgents().ToList();
+        InvokeAsync(StateHasChanged);
+    }
+
+    private string GetStateBadge(AgentState state) => state switch
+    {
+        AgentState.Available => "bg-success",
+        AgentState.Busy => "bg-danger",
+        AgentState.OnBreak => "bg-warning text-dark",
+        _ => "bg-secondary"
+    };
+
+    public void Dispose()
+    {
+        CallManager.OnCallUpdated -= HandleUpdate;
+        CallManager.OnCallCompleted -= HandleComplete;
+    }
+}

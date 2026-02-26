@@ -1,0 +1,295 @@
+@page "/cm10-admin"
+@using PstnSimulator.Models
+@using PstnSimulator.Services
+@inject Cm10Service Cm10
+@inject PstnService Pstn
+
+<h3 class="mb-3"><i class="bi bi-diagram-3 me-2"></i>CM10 Administration</h3>
+
+@* ─── Outbound Gateways / SBCs ─── *@
+<div class="row mb-3">
+    <div class="col-12">
+        <div class="card bg-dark text-light">
+            <div class="card-header"><i class="bi bi-hdd-rack me-1"></i> Outbound Gateways / SBCs</div>
+            <div class="card-body p-0">
+                <table class="table table-dark table-sm table-hover mb-0">
+                    <thead>
+                        <tr>
+                            <th>Name</th>
+                            <th>Type</th>
+                            <th>FQDN</th>
+                            <th>IP Address</th>
+                            <th>SIP Port</th>
+                            <th>Status</th>
+                            <th>TLS</th>
+                            <th>Trunks</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var gw in Pstn.GetGateways())
+                        {
+                            <tr>
+                                <td>@gw.Name</td>
+                                <td><span class="badge bg-secondary">@gw.Type</span></td>
+                                <td class="font-monospace">@gw.Fqdn</td>
+                                <td class="font-monospace">@gw.IpAddress</td>
+                                <td>@gw.SipPort</td>
+                                <td>
+                                    @if (gw.Registered)
+                                    {
+                                        <span class="badge bg-success"><i class="bi bi-check-circle me-1"></i>Online</span>
+                                    }
+                                    else
+                                    {
+                                        <span class="badge bg-danger"><i class="bi bi-x-circle me-1"></i>Offline</span>
+                                    }
+                                </td>
+                                <td>
+                                    @if (gw.TlsEnabled)
+                                    {
+                                        <span class="badge bg-info"><i class="bi bi-lock-fill me-1"></i>TLS</span>
+                                    }
+                                    else
+                                    {
+                                        <span class="text-muted">TCP</span>
+                                    }
+                                </td>
+                                <td>@(gw.TrunkNames.Any() ? string.Join(", ", gw.TrunkNames) : "—")</td>
+                            </tr>
+                        }
+                        @if (!Pstn.GetGateways().Any())
+                        {
+                            <tr><td colspan="8" class="text-muted text-center">No gateways configured</td></tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    @* ─── PSTN Trunks ─── *@
+    <div class="col-md-6 mb-3">
+        <div class="card bg-dark text-light">
+            <div class="card-header"><i class="bi bi-ethernet me-1"></i> PSTN Trunks</div>
+            <div class="card-body p-0">
+                <table class="table table-dark table-sm table-hover mb-0">
+                    <thead>
+                        <tr>
+                            <th>Name</th>
+                            <th>Type</th>
+                            <th>Capacity</th>
+                            <th>In Use</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var trunk in Pstn.GetTrunks())
+                        {
+                            <tr>
+                                <td>@trunk.Name</td>
+                                <td><span class="badge bg-secondary">@trunk.Type</span></td>
+                                <td>@trunk.Capacity</td>
+                                <td>
+                                    <div class="progress" style="height: 18px;">
+                                        @{
+                                            var pct = trunk.Capacity > 0 ? (trunk.ActiveChannels * 100 / trunk.Capacity) : 0;
+                                            var color = pct > 80 ? "bg-danger" : pct > 50 ? "bg-warning" : "bg-success";
+                                        }
+                                        <div class="progress-bar @color" style="width: @pct%">@trunk.ActiveChannels / @trunk.Capacity</div>
+                                    </div>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    @* ─── DIDs ─── *@
+    <div class="col-md-6 mb-3">
+        <div class="card bg-dark text-light">
+            <div class="card-header"><i class="bi bi-hash me-1"></i> DID Assignments</div>
+            <div class="card-body p-0">
+                <table class="table table-dark table-sm table-hover mb-0">
+                    <thead>
+                        <tr>
+                            <th>DID Number</th>
+                            <th>Label</th>
+                            <th>Trunk</th>
+                            <th>VDN</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var did in Pstn.GetDids())
+                        {
+                            <tr>
+                                <td class="font-monospace">@did.Number</td>
+                                <td>@did.Label</td>
+                                <td>@did.TrunkName</td>
+                                <td><span class="badge bg-info">@did.VdnNumber</span></td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    @* ─── VDNs ─── *@
+    <div class="col-md-6 mb-3">
+        <div class="card bg-dark text-light">
+            <div class="card-header"><i class="bi bi-signpost-split me-1"></i> VDNs (Virtual Directory Numbers)</div>
+            <div class="card-body p-0">
+                <table class="table table-dark table-sm table-hover mb-0">
+                    <thead>
+                        <tr>
+                            <th>VDN</th>
+                            <th>Label</th>
+                            <th>Vector</th>
+                            <th>Destination</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var vdn in Cm10.GetVdns())
+                        {
+                            <tr>
+                                <td class="font-monospace">@vdn.Number</td>
+                                <td>@vdn.Label</td>
+                                <td>@vdn.VectorId</td>
+                                <td><span class="badge @GetDestBadge(vdn.Destination)">@vdn.Destination</span></td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    @* ─── Vectors ─── *@
+    <div class="col-md-6 mb-3">
+        <div class="card bg-dark text-light">
+            <div class="card-header"><i class="bi bi-list-nested me-1"></i> Call Vectors</div>
+            <div class="card-body">
+                @foreach (var vector in Cm10.GetVectors())
+                {
+                    <div class="mb-3">
+                        <h6 class="text-info">@vector.Name <small class="text-muted">(@vector.Id)</small></h6>
+                        <ol class="small mb-0" start="1">
+                            @foreach (var step in vector.Steps)
+                            {
+                                <li>
+                                    <span class="badge bg-secondary me-1">@step.Type</span>
+                                    @switch (step.Type)
+                                    {
+                                        case VectorStepType.Route:
+                                            <text>→ @step.Destination</text>
+                                            break;
+                                        case VectorStepType.Queue:
+                                            <text>→ @step.QueueName</text>
+                                            break;
+                                        case VectorStepType.Announcement:
+                                            <text>"@step.Message"</text>
+                                            break;
+                                        case VectorStepType.Wait:
+                                            <text>@step.Seconds seconds</text>
+                                            break;
+                                        case VectorStepType.Goto:
+                                            <text>→ step @step.StepIndex</text>
+                                            break;
+                                        case VectorStepType.TimeCheck:
+                                            <text>@step.Message</text>
+                                            break;
+                                        case VectorStepType.Disconnect:
+                                            <text>(end call)</text>
+                                            break;
+                                    }
+                                </li>
+                            }
+                        </ol>
+                    </div>
+                }
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    @* ─── ACD Queues ─── *@
+    <div class="col-md-6 mb-3">
+        <div class="card bg-dark text-light">
+            <div class="card-header"><i class="bi bi-people me-1"></i> ACD Queues</div>
+            <div class="card-body p-0">
+                <table class="table table-dark table-sm table-hover mb-0">
+                    <thead>
+                        <tr>
+                            <th>Queue Name</th>
+                            <th>Strategy</th>
+                            <th>Agents</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var queue in Cm10.GetQueues())
+                        {
+                            <tr>
+                                <td>@queue.Name</td>
+                                <td><span class="badge bg-info">@queue.Strategy</span></td>
+                                <td>@string.Join(", ", queue.AgentIds)</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    @* ─── Callers ─── *@
+    <div class="col-md-6 mb-3">
+        <div class="card bg-dark text-light">
+            <div class="card-header"><i class="bi bi-person-lines-fill me-1"></i> Simulated Callers</div>
+            <div class="card-body p-0">
+                <table class="table table-dark table-sm table-hover mb-0">
+                    <thead>
+                        <tr>
+                            <th>Name</th>
+                            <th>Number</th>
+                            <th>Type</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var caller in Pstn.GetCallers())
+                        {
+                            <tr>
+                                <td>@caller.Name</td>
+                                <td class="font-monospace">@caller.Number</td>
+                                <td>
+                                    <span class="badge @GetCallerBadge(caller.Type)">@caller.Type</span>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+@code {
+    private string GetDestBadge(string dest) => dest switch
+    {
+        "IVR" => "bg-warning text-dark",
+        _ when dest.StartsWith("Queue:") => "bg-success",
+        _ when dest.StartsWith("Announcement:") => "bg-info",
+        _ => "bg-secondary"
+    };
+
+    private string GetCallerBadge(CallerType type) => type switch
+    {
+        CallerType.VIP => "bg-warning text-dark",
+        CallerType.Blocked => "bg-danger",
+        _ => "bg-secondary"
+    };
+}

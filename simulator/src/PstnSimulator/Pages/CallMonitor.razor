@@ -1,0 +1,205 @@
+@page "/call-monitor"
+@using PstnSimulator.Models
+@using PstnSimulator.Services
+@inject CallStateManager CallManager
+@implements IDisposable
+
+<h3 class="mb-3"><i class="bi bi-activity me-2"></i>Call Monitor</h3>
+
+<div class="row">
+    @* ─── Active Calls ─── *@
+    <div class="col-md-4">
+        <div class="card bg-dark text-light mb-3">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <span><i class="bi bi-telephone-forward me-1"></i> Active Calls</span>
+                <span class="badge bg-primary">@_activeCalls.Count</span>
+            </div>
+            <div class="list-group list-group-flush">
+                @if (_activeCalls.Count == 0)
+                {
+                    <div class="list-group-item bg-dark text-muted text-center border-secondary">
+                        No active calls
+                    </div>
+                }
+                @foreach (var call in _activeCalls)
+                {
+                    <button class="list-group-item list-group-item-action bg-dark text-light border-secondary @(_selectedCallId == call.Id ? "active" : "")"
+                            @onclick="() => SelectCall(call.Id)">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                <div class="fw-bold">@call.CallerName</div>
+                                <small class="text-muted">@call.CallerNumber → @call.DidNumber</small>
+                            </div>
+                            <span class="badge @GetStateBadge(call.State) rounded-pill">@call.State</span>
+                        </div>
+                    </button>
+                }
+            </div>
+        </div>
+
+        @* ─── Recent CDRs ─── *@
+        <div class="card bg-dark text-light">
+            <div class="card-header">
+                <i class="bi bi-clock-history me-1"></i> Recent Completed Calls
+            </div>
+            <div class="list-group list-group-flush" style="max-height: 300px; overflow-y: auto;">
+                @if (!_cdrs.Any())
+                {
+                    <div class="list-group-item bg-dark text-muted text-center border-secondary">
+                        No completed calls yet
+                    </div>
+                }
+                @foreach (var cdr in _cdrs.Take(20))
+                {
+                    <div class="list-group-item bg-dark text-light border-secondary small">
+                        <div class="d-flex justify-content-between">
+                            <span>@cdr.CallerNumber → @cdr.DidNumber</span>
+                            <span class="badge @GetDispositionBadge(cdr.FinalState)">@cdr.FinalState</span>
+                        </div>
+                        <small class="text-muted">
+                            @cdr.StartTime.ToString("HH:mm:ss") — @cdr.Duration.ToString(@"mm\:ss")
+                            @if (cdr.AgentName != null) { <text> — @cdr.AgentName</text> }
+                        </small>
+                    </div>
+                }
+            </div>
+        </div>
+    </div>
+
+    @* ─── Selected Call Event Trace ─── *@
+    <div class="col-md-8">
+        <div class="card bg-dark text-light" style="min-height: 600px;">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <span><i class="bi bi-list-ol me-1"></i> Event Trace</span>
+                @if (_selectedCall != null)
+                {
+                    <div>
+                        <span class="badge @GetStateBadge(_selectedCall.State) me-2">@_selectedCall.State</span>
+                        <span class="badge bg-secondary">@_selectedCall.Events.Count events</span>
+                    </div>
+                }
+            </div>
+            <div class="card-body p-0">
+                <div class="call-trace" style="max-height: 600px; overflow-y: auto;">
+                    @if (_selectedCall != null)
+                    {
+                        <table class="table table-dark table-sm table-hover mb-0">
+                            <thead>
+                                <tr>
+                                    <th style="width:100px">Time</th>
+                                    <th style="width:80px">Source</th>
+                                    <th>Event</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var evt in _selectedCall.Events)
+                                {
+                                    <tr>
+                                        <td class="font-monospace small">@evt.Timestamp.ToString("HH:mm:ss.fff")</td>
+                                        <td>
+                                            <span class="badge @GetSourceBadge(evt.Source) small">@evt.Source</span>
+                                        </td>
+                                        <td>
+                                            @evt.Message
+                                            @if (!string.IsNullOrEmpty(evt.Detail))
+                                            {
+                                                <div class="text-muted small">@evt.Detail</div>
+                                            }
+                                        </td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    }
+                    else
+                    {
+                        <div class="p-4 text-muted text-center">
+                            <i class="bi bi-hand-index me-1"></i> Select a call from the list to view its event trace
+                        </div>
+                    }
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@code {
+    private List<SimulatedCall> _activeCalls = new();
+    private List<CallDetailRecord> _cdrs = new();
+    private string? _selectedCallId;
+    private SimulatedCall? _selectedCall;
+
+    protected override void OnInitialized()
+    {
+        RefreshData();
+        CallManager.OnCallsChanged += HandleCallsChanged;
+        CallManager.OnCallUpdated += HandleCallUpdated;
+        CallManager.OnCallCompleted += HandleCallCompleted;
+    }
+
+    private void RefreshData()
+    {
+        _activeCalls = CallManager.GetActiveCalls().OrderByDescending(c => c.StartTime).ToList();
+        _cdrs = CallManager.GetRecentCdrs().OrderByDescending(c => c.StartTime).ToList();
+        if (_selectedCallId != null)
+            _selectedCall = CallManager.GetCall(_selectedCallId);
+    }
+
+    private void SelectCall(string callId)
+    {
+        _selectedCallId = callId;
+        _selectedCall = CallManager.GetCall(callId);
+    }
+
+    private void HandleCallsChanged()
+    {
+        RefreshData();
+        InvokeAsync(StateHasChanged);
+    }
+
+    private void HandleCallUpdated(SimulatedCall call)
+    {
+        RefreshData();
+        InvokeAsync(StateHasChanged);
+    }
+
+    private void HandleCallCompleted(CallDetailRecord cdr)
+    {
+        RefreshData();
+        InvokeAsync(StateHasChanged);
+    }
+
+    private string GetStateBadge(CallState state) => state switch
+    {
+        CallState.IvrAnswered or CallState.IvrPlaying or CallState.IvrRecognizing => "bg-warning text-dark",
+        CallState.AgentConnected => "bg-success",
+        CallState.AcdQueued or CallState.AgentRinging => "bg-info",
+        CallState.Disconnected => "bg-secondary",
+        CallState.Failed => "bg-danger",
+        _ => "bg-primary"
+    };
+
+    private string GetSourceBadge(CallEventSource src) => src switch
+    {
+        CallEventSource.Pstn => "bg-primary",
+        CallEventSource.Cm10 => "bg-success",
+        CallEventSource.Ivr => "bg-warning text-dark",
+        CallEventSource.Acs => "bg-info",
+        CallEventSource.Agent => "bg-danger",
+        _ => "bg-secondary"
+    };
+
+    private string GetDispositionBadge(CallState state) => state switch
+    {
+        CallState.Disconnected => "bg-secondary",
+        CallState.Failed => "bg-danger",
+        _ => "bg-info"
+    };
+
+    public void Dispose()
+    {
+        CallManager.OnCallsChanged -= HandleCallsChanged;
+        CallManager.OnCallUpdated -= HandleCallUpdated;
+        CallManager.OnCallCompleted -= HandleCallCompleted;
+    }
+}

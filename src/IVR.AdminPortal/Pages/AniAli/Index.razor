@@ -1,0 +1,295 @@
+@page "/ani-ali"
+@using IVR.Core.Interfaces
+@using IVR.Core.Models
+@inject ICosmosDbService CosmosDb
+
+<PageTitle>ANI / ALI Data — IVR Admin</PageTitle>
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h3><i class="bi bi-person-lines-fill me-2"></i>ANI / ALI Data</h3>
+    <div>
+        <button class="btn btn-outline-secondary me-2">
+            <i class="bi bi-upload me-1"></i>Import CSV
+        </button>
+        <button class="btn btn-primary" @onclick="ShowCreateDialog">
+            <i class="bi bi-plus-lg me-1"></i>Add Record
+        </button>
+    </div>
+</div>
+
+<!-- Tabs: ANI vs ALI -->
+<ul class="nav nav-tabs mb-3">
+    <li class="nav-item">
+        <button class="nav-link @(_activeTab == "ani" ? "active" : "")" @onclick='() => _activeTab = "ani"'>
+            <i class="bi bi-telephone me-1"></i> ANI Records (Caller ID)
+        </button>
+    </li>
+    <li class="nav-item">
+        <button class="nav-link @(_activeTab == "ali" ? "active" : "")" @onclick='() => _activeTab = "ali"'>
+            <i class="bi bi-geo-alt me-1"></i> ALI Records (Location)
+        </button>
+    </li>
+</ul>
+
+<!-- Search -->
+<div class="input-group mb-3">
+    <span class="input-group-text"><i class="bi bi-search"></i></span>
+    <input type="text" class="form-control" placeholder="Search by phone number, name, or location..."
+        @bind="_searchTerm" @bind:event="oninput" @onkeyup="HandleSearch" />
+    <button class="btn btn-outline-secondary" @onclick="SearchRecords">Search</button>
+</div>
+
+@if (_activeTab == "ani")
+{
+    <!-- ANI Records Table -->
+    <div class="card border-0 shadow-sm">
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table table-hover mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Phone Number</th>
+                            <th>Caller Name</th>
+                            <th>Account #</th>
+                            <th>Type</th>
+                            <th>Language</th>
+                            <th>VIP</th>
+                            <th>Blocked</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var record in _aniRecords)
+                        {
+                            <tr>
+                                <td><code>@record.PhoneNumber</code></td>
+                                <td>@(record.CallerName ?? "—")</td>
+                                <td>@(record.AccountNumber ?? "—")</td>
+                                <td><span class="badge bg-info">@record.CallerType</span></td>
+                                <td>@record.Language</td>
+                                <td>
+                                    @if (record.IsVip)
+                                    {
+                                        <i class="bi bi-star-fill text-warning"></i>
+                                    }
+                                </td>
+                                <td>
+                                    @if (record.IsBlocked)
+                                    {
+                                        <i class="bi bi-slash-circle text-danger"></i>
+                                    }
+                                </td>
+                                <td>
+                                    <div class="btn-group btn-group-sm">
+                                        <button class="btn btn-outline-primary" @onclick="() => EditAniRecord(record)">
+                                            <i class="bi bi-pencil"></i>
+                                        </button>
+                                        <button class="btn btn-outline-danger" @onclick="() => DeleteAniRecord(record)">
+                                            <i class="bi bi-trash"></i>
+                                        </button>
+                                    </div>
+                                </td>
+                            </tr>
+                        }
+                        @if (!_aniRecords.Any())
+                        {
+                            <tr>
+                                <td colspan="8" class="text-center text-muted py-4">No ANI records found</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+}
+else
+{
+    <!-- ALI Records Table -->
+    <div class="card border-0 shadow-sm">
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table table-hover mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Phone Number</th>
+                            <th>Address</th>
+                            <th>City</th>
+                            <th>State</th>
+                            <th>Zip</th>
+                            <th>Type</th>
+                            <th>Service Area</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var record in _aliRecords)
+                        {
+                            <tr>
+                                <td><code>@record.PhoneNumber</code></td>
+                                <td>@(record.Address.Street ?? "—")</td>
+                                <td>@(record.Address.City ?? "—")</td>
+                                <td>@(record.Address.State ?? "—")</td>
+                                <td>@(record.Address.ZipCode ?? "—")</td>
+                                <td><span class="badge bg-info">@record.LocationType</span></td>
+                                <td>@(record.ServiceArea ?? "—")</td>
+                                <td>
+                                    <div class="btn-group btn-group-sm">
+                                        <button class="btn btn-outline-primary" @onclick="() => EditAliRecord(record)">
+                                            <i class="bi bi-pencil"></i>
+                                        </button>
+                                        <button class="btn btn-outline-danger" @onclick="() => DeleteAliRecord(record)">
+                                            <i class="bi bi-trash"></i>
+                                        </button>
+                                    </div>
+                                </td>
+                            </tr>
+                        }
+                        @if (!_aliRecords.Any())
+                        {
+                            <tr>
+                                <td colspan="8" class="text-center text-muted py-4">No ALI records found</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+}
+
+<!-- Create/Edit ANI Modal -->
+@if (_showAniModal)
+{
+    <div class="modal show d-block" style="background-color: rgba(0,0,0,0.5);">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">@(_editingAni.Id == null ? "Add ANI Record" : "Edit ANI Record")</h5>
+                    <button type="button" class="btn-close" @onclick="() => _showAniModal = false"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label class="form-label">Phone Number</label>
+                            <input type="tel" class="form-control" @bind="_editingAni.PhoneNumber"
+                                placeholder="+15551234567" />
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Caller Name</label>
+                            <input type="text" class="form-control" @bind="_editingAni.CallerName" />
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Account Number</label>
+                            <input type="text" class="form-control" @bind="_editingAni.AccountNumber" />
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Caller Type</label>
+                            <select class="form-select" @bind="_editingAni.CallerType">
+                                @foreach (var ct in Enum.GetValues<CallerType>())
+                                {
+                                    <option value="@ct">@ct</option>
+                                }
+                            </select>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Language</label>
+                            <select class="form-select" @bind="_editingAni.Language">
+                                <option value="en-US">English (US)</option>
+                                <option value="es-ES">Spanish</option>
+                                <option value="fr-FR">French</option>
+                            </select>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Priority</label>
+                            <input type="number" class="form-control" @bind="_editingAni.Priority" />
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Custom Routing Menu ID</label>
+                            <input type="text" class="form-control" @bind="_editingAni.CustomRoutingMenuId" />
+                        </div>
+                        <div class="col-md-4 d-flex align-items-end gap-3">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" @bind="_editingAni.IsVip" />
+                                <label class="form-check-label">VIP</label>
+                            </div>
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" @bind="_editingAni.IsBlocked" />
+                                <label class="form-check-label">Blocked</label>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn-secondary" @onclick="() => _showAniModal = false">Cancel</button>
+                    <button class="btn btn-primary" @onclick="SaveAniRecord">
+                        <i class="bi bi-check-lg me-1"></i>Save
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    private string _activeTab = "ani";
+    private string _searchTerm = "";
+    private List<AniRecord> _aniRecords = new();
+    private List<AliRecord> _aliRecords = new();
+    private bool _showAniModal = false;
+    private AniRecord _editingAni = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        await SearchRecords();
+    }
+
+    private async Task SearchRecords()
+    {
+        var search = string.IsNullOrWhiteSpace(_searchTerm) ? null : _searchTerm;
+        _aniRecords = await CosmosDb.SearchAniRecordsAsync(search);
+        _aliRecords = await CosmosDb.SearchAliRecordsAsync(search);
+    }
+
+    private async Task HandleSearch(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter")
+            await SearchRecords();
+    }
+
+    private void ShowCreateDialog()
+    {
+        if (_activeTab == "ani")
+        {
+            _editingAni = new AniRecord();
+            _showAniModal = true;
+        }
+    }
+
+    private void EditAniRecord(AniRecord record)
+    {
+        _editingAni = record;
+        _showAniModal = true;
+    }
+
+    private async Task SaveAniRecord()
+    {
+        await CosmosDb.UpsertAniRecordAsync(_editingAni);
+        await SearchRecords();
+        _showAniModal = false;
+    }
+
+    private async Task DeleteAniRecord(AniRecord record)
+    {
+        await CosmosDb.DeleteAniRecordAsync(record.Id, record.PartitionKey);
+        await SearchRecords();
+    }
+
+    private void EditAliRecord(AliRecord record) { /* Open edit modal */ }
+
+    private async Task DeleteAliRecord(AliRecord record)
+    {
+        await CosmosDb.DeleteAliRecordAsync(record.Id, record.PartitionKey);
+        await SearchRecords();
+    }
+}

@@ -1,0 +1,231 @@
+@page "/"
+@using IVR.AdminPortal.Services
+@inject AdminDashboardService DashboardService
+
+<PageTitle>Dashboard — IVR Admin</PageTitle>
+
+<h3 class="mb-4"><i class="bi bi-speedometer2 me-2"></i>Dashboard</h3>
+
+@if (_loading)
+{
+    <div class="d-flex justify-content-center p-5">
+        <div class="spinner-border text-primary" role="status">
+            <span class="visually-hidden">Loading...</span>
+        </div>
+    </div>
+}
+else if (_summary != null)
+{
+    <!-- Summary Cards -->
+    <div class="row g-4 mb-4">
+        <div class="col-md-3">
+            <div class="card border-0 shadow-sm">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between">
+                        <div>
+                            <h6 class="text-muted mb-1">Today's Calls</h6>
+                            <h2 class="mb-0">@_summary.TodayCallCount</h2>
+                        </div>
+                        <div class="bg-primary bg-opacity-10 rounded-circle p-3">
+                            <i class="bi bi-telephone text-primary fs-4"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-3">
+            <div class="card border-0 shadow-sm">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between">
+                        <div>
+                            <h6 class="text-muted mb-1">Avg Duration</h6>
+                            <h2 class="mb-0">@FormatDuration(_summary.TodayAverageCallDuration)</h2>
+                        </div>
+                        <div class="bg-success bg-opacity-10 rounded-circle p-3">
+                            <i class="bi bi-clock text-success fs-4"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-3">
+            <div class="card border-0 shadow-sm">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between">
+                        <div>
+                            <h6 class="text-muted mb-1">Active Menus</h6>
+                            <h2 class="mb-0">@_summary.ActiveMenuCount</h2>
+                        </div>
+                        <div class="bg-warning bg-opacity-10 rounded-circle p-3">
+                            <i class="bi bi-diagram-3 text-warning fs-4"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-3">
+            <div class="card border-0 shadow-sm">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between">
+                        <div>
+                            <h6 class="text-muted mb-1">Status</h6>
+                            <h5 class="mb-0">
+                                @if (_summary.IsBusinessHoursNow)
+                                {
+                                    <span class="badge bg-success">Open</span>
+                                }
+                                else
+                                {
+                                    <span class="badge bg-secondary">After Hours</span>
+                                }
+                            </h5>
+                        </div>
+                        <div class="bg-info bg-opacity-10 rounded-circle p-3">
+                            <i class="bi bi-building text-info fs-4"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Charts Row -->
+    <div class="row g-4 mb-4">
+        <div class="col-md-6">
+            <div class="card border-0 shadow-sm">
+                <div class="card-header bg-white">
+                    <h6 class="mb-0">Call Disposition (This Week)</h6>
+                </div>
+                <div class="card-body">
+                    @foreach (var kvp in _summary.CallsByDisposition)
+                    {
+                        var percentage = _summary.WeekCallCount > 0
+                            ? (double)kvp.Value / _summary.WeekCallCount * 100 : 0;
+                        <div class="mb-2">
+                            <div class="d-flex justify-content-between small">
+                                <span>@kvp.Key</span>
+                                <span>@kvp.Value (@percentage.ToString("F1")%)</span>
+                            </div>
+                            <div class="progress" style="height: 6px;">
+                                <div class="progress-bar" role="progressbar"
+                                    style="width: @percentage%"></div>
+                            </div>
+                        </div>
+                    }
+                    @if (!_summary.CallsByDisposition.Any())
+                    {
+                        <p class="text-muted text-center">No call data available</p>
+                    }
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-6">
+            <div class="card border-0 shadow-sm">
+                <div class="card-header bg-white">
+                    <h6 class="mb-0">Calls by Hour (Today)</h6>
+                </div>
+                <div class="card-body">
+                    <div class="d-flex align-items-end" style="height: 200px;">
+                        @for (int i = 0; i < 24; i++)
+                        {
+                            var count = _summary.CallsByHour.GetValueOrDefault(i, 0);
+                            var maxCount = _summary.CallsByHour.Values.DefaultIfEmpty(1).Max();
+                            var height = maxCount > 0 ? (double)count / maxCount * 100 : 0;
+                            <div class="flex-fill mx-1" title="@i:00 - @count calls">
+                                <div class="bg-primary rounded-top" style="height: @height%; min-height: 2px;"></div>
+                            </div>
+                        }
+                    </div>
+                    <div class="d-flex justify-content-between small text-muted mt-1">
+                        <span>12am</span>
+                        <span>6am</span>
+                        <span>12pm</span>
+                        <span>6pm</span>
+                        <span>12am</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Recent Calls -->
+    <div class="card border-0 shadow-sm">
+        <div class="card-header bg-white d-flex justify-content-between align-items-center">
+            <h6 class="mb-0">Recent Calls</h6>
+            <a href="/call-logs" class="btn btn-sm btn-outline-primary">View All</a>
+        </div>
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table table-hover mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Time</th>
+                            <th>Caller</th>
+                            <th>Name</th>
+                            <th>Status</th>
+                            <th>Duration</th>
+                            <th>Disposition</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var call in _summary.RecentCalls)
+                        {
+                            <tr>
+                                <td>@call.StartTime.ToString("HH:mm:ss")</td>
+                                <td><code>@call.CallerNumber</code></td>
+                                <td>@(call.AniData?.CallerName ?? "—")</td>
+                                <td>
+                                    <span class="badge @GetStatusBadgeClass(call.Status)">
+                                        @call.Status
+                                    </span>
+                                </td>
+                                <td>@(call.DurationSeconds.HasValue ? FormatDuration(call.DurationSeconds.Value) : "—")</td>
+                                <td>@call.Disposition</td>
+                            </tr>
+                        }
+                        @if (!_summary.RecentCalls.Any())
+                        {
+                            <tr>
+                                <td colspan="6" class="text-center text-muted py-4">No calls today</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    private DashboardSummary? _summary;
+    private bool _loading = true;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            _summary = await DashboardService.GetDashboardSummaryAsync();
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private static string FormatDuration(double seconds) =>
+        TimeSpan.FromSeconds(seconds).ToString(@"m\:ss");
+
+    private static string GetStatusBadgeClass(CallStatus status) => status switch
+    {
+        CallStatus.InProgress => "bg-success",
+        CallStatus.Completed => "bg-primary",
+        CallStatus.Failed => "bg-danger",
+        CallStatus.Abandoned => "bg-warning",
+        CallStatus.Transferred => "bg-info",
+        _ => "bg-secondary"
+    };
+}

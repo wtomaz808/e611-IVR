@@ -1,0 +1,122 @@
+name: Deploy IVR System
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+env:
+  DOTNET_VERSION: '8.0.x'
+  AZURE_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+  AZURE_RG: ${{ secrets.AZURE_RESOURCE_GROUP }}
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+
+      - name: Restore
+        run: dotnet restore src/IVR.sln
+
+      - name: Build
+        run: dotnet build src/IVR.sln --configuration Release --no-restore
+
+      - name: Test
+        run: dotnet test src/IVR.sln --configuration Release --no-build --verbosity normal
+
+      # Publish Function App
+      - name: Publish Functions
+        run: dotnet publish src/IVR.Functions/IVR.Functions.csproj -c Release -o ./publish/functions
+
+      - name: Upload Functions Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: functions
+          path: ./publish/functions
+
+      # Publish Admin Portal
+      - name: Publish Admin Portal
+        run: dotnet publish src/IVR.AdminPortal/IVR.AdminPortal.csproj -c Release -o ./publish/admin
+
+      - name: Upload Admin Portal Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: admin-portal
+          path: ./publish/admin
+
+  deploy-infra:
+    needs: build
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+    outputs:
+      functionAppName: ${{ steps.deploy.outputs.functionAppUrl }}
+      adminPortalName: ${{ steps.deploy.outputs.adminPortalUrl }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Azure Login
+        uses: azure/login@v2
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - name: Deploy Bicep
+        id: deploy
+        uses: azure/arm-deploy@v2
+        with:
+          scope: resourcegroup
+          subscriptionId: ${{ env.AZURE_SUBSCRIPTION_ID }}
+          resourceGroupName: ${{ env.AZURE_RG }}
+          template: ./infra/main.bicep
+          parameters: ./infra/parameters/dev.bicepparam
+          failOnStdErr: false
+
+  deploy-functions:
+    needs: deploy-infra
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+    steps:
+      - name: Azure Login
+        uses: azure/login@v2
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - name: Download artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: functions
+          path: ./functions
+
+      - name: Deploy to Azure Functions
+        uses: Azure/functions-action@v1
+        with:
+          app-name: ${{ secrets.FUNCTION_APP_NAME }}
+          package: ./functions
+
+  deploy-admin:
+    needs: deploy-infra
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+    steps:
+      - name: Azure Login
+        uses: azure/login@v2
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - name: Download artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: admin-portal
+          path: ./admin
+
+      - name: Deploy to App Service
+        uses: azure/webapps-deploy@v3
+        with:
+          app-name: ${{ secrets.ADMIN_APP_NAME }}
+          package: ./admin

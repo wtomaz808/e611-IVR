@@ -1,0 +1,23 @@
+# Build outputs — prevent host obj/ from overwriting container restore
+**/bin/
+**/obj/
+**/out/
+
+# IDE / editor files
+**/.vs/
+**/.vscode/
+**/.idea/
+**/*.user
+**/*.suo
+
+# Docker
+**/Dockerfile*
+**/.dockerignore
+
+# Secrets (never bake into images)
+**/local.settings.json
+**/appsettings.Development.json
+
+# OS files
+**/.DS_Store
+**/Thumbs.db

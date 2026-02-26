@@ -1,0 +1,36 @@
+# Build outputs
+**/bin/
+**/obj/
+**/out/
+
+# IDE / editor files
+**/.vs/
+**/.vscode/
+**/.idea/
+**/*.user
+**/*.suo
+**/*.csproj.user
+
+# Docker
+**/Dockerfile*
+**/.dockerignore
+docker-compose*.yml
+
+# Git
+.git/
+.gitignore
+
+# Docs and infra (not needed in images)
+docs/
+infra/
+tests/
+README.md
+
+# OS files
+**/.DS_Store
+**/Thumbs.db
+
+# Secrets (never bake into images)
+**/local.settings.json
+**/appsettings.Development.json
+**/*.env

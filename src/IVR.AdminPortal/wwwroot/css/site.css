@@ -1,0 +1,44 @@
+:root {
+    --sidebar-width: 260px;
+}
+
+body {
+    font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+    background-color: #f5f6fa;
+}
+
+.nav-link:hover {
+    background-color: rgba(255, 255, 255, 0.1);
+    border-radius: 6px;
+}
+
+.card {
+    border-radius: 12px;
+}
+
+.badge {
+    font-weight: 500;
+}
+
+kbd {
+    background-color: #e9ecef;
+    color: #495057;
+    border-radius: 4px;
+    font-size: 0.9em;
+}
+
+.table th {
+    font-weight: 600;
+    font-size: 0.85rem;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: #6c757d;
+}
+
+.progress {
+    border-radius: 4px;
+}
+
+.offcanvas {
+    z-index: 1050;
+}

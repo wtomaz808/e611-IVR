@@ -1,0 +1,379 @@
+@page "/"
+@using PstnSimulator.Models
+@using PstnSimulator.Services
+@inject IAcsBridge AcsBridge
+@inject CallStateManager CallManager
+@inject PstnService PstnService
+@inject Cm10Service Cm10Service
+@inject IConfiguration Config
+@implements IDisposable
+
+<h3 class="mb-3"><i class="bi bi-telephone-fill me-2"></i>Phone Simulator</h3>
+
+<div class="row">
+    @* ─── LEFT: Dialer ─── *@
+    <div class="col-md-5">
+        <div class="card bg-dark text-light mb-3">
+            <div class="card-header">
+                <i class="bi bi-phone me-1"></i> Dialer
+            </div>
+            <div class="card-body">
+                @* Caller Selection *@
+                <div class="mb-3">
+                    <label class="form-label small text-muted">Caller</label>
+                    <select class="form-select form-select-sm bg-dark text-light" @bind="_selectedCaller">
+                        @foreach (var caller in PstnService.GetCallers())
+                        {
+                            <option value="@caller.Number">@caller.Name (@caller.Number) — @caller.Type</option>
+                        }
+                    </select>
+                </div>
+
+                @* DID Selection *@
+                <div class="mb-3">
+                    <label class="form-label small text-muted">Called Number (DID)</label>
+                    <select class="form-select form-select-sm bg-dark text-light" @bind="_selectedDid">
+                        @foreach (var did in PstnService.GetDids())
+                        {
+                            <option value="@did.Number">@did.Label (@did.Number)</option>
+                        }
+                    </select>
+                </div>
+
+                @* Call / Hangup Buttons *@
+                <div class="d-flex gap-2 mb-3">
+                    <button class="btn btn-success flex-fill" @onclick="PlaceCall" disabled="@(_activeCall != null)">
+                        <i class="bi bi-telephone-fill me-1"></i> Call
+                    </button>
+                    <button class="btn btn-danger flex-fill" @onclick="HangUp" disabled="@(_activeCall == null)">
+                        <i class="bi bi-telephone-x-fill me-1"></i> Hang Up
+                    </button>
+                </div>
+
+                @* ─── DTMF Keypad ─── *@
+                <div class="mb-3">
+                    <label class="form-label small text-muted">DTMF Keypad</label>
+                    <div class="dtmf-grid">
+                        @foreach (var key in new[] { "1", "2", "3", "4", "5", "6", "7", "8", "9", "*", "0", "#" })
+                        {
+                            <button class="dtmf-key" @onclick="() => SendDtmf(key)"
+                                    disabled="@(_activeCall == null || _activeCall.State != CallState.IvrRecognizing || _activeCall.RecognizeType != "dtmf")">
+                                @key
+                            </button>
+                        }
+                    </div>
+                </div>
+
+                @* ─── Speech Input ─── *@
+                <div class="mb-3">
+                    <label class="form-label small text-muted">Speech Input</label>
+                    <div class="input-group input-group-sm">
+                        <input type="text" class="form-control bg-dark text-light" placeholder="Speak to the IVR…"
+                               @bind="_speechText" @bind:event="oninput" @onkeydown="HandleSpeechKeyDown"
+                               disabled="@(_activeCall == null || _activeCall.State != CallState.IvrRecognizing || _activeCall.RecognizeType != "speech")" />
+                        <button class="btn btn-outline-info" @onclick="SendSpeech"
+                                disabled="@(string.IsNullOrWhiteSpace(_speechText) || _activeCall == null || _activeCall.State != CallState.IvrRecognizing)">
+                            <i class="bi bi-mic-fill"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        @* ─── Call Status ─── *@
+        @if (_activeCall != null)
+        {
+            <div class="card bg-dark text-light mb-3">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <span><i class="bi bi-info-circle me-1"></i> Active Call</span>
+                    <span class="badge @GetStateBadgeClass(_activeCall.State)">@_activeCall.State</span>
+                </div>
+                <div class="card-body small">
+                    <div class="row mb-1">
+                        <div class="col-4 text-muted">Call ID</div>
+                        <div class="col-8 font-monospace">@_activeCall.Id[..Math.Min(12, _activeCall.Id.Length)]…</div>
+                    </div>
+                    <div class="row mb-1">
+                        <div class="col-4 text-muted">Caller</div>
+                        <div class="col-8">@_activeCall.CallerName (@_activeCall.CallerNumber)</div>
+                    </div>
+                    <div class="row mb-1">
+                        <div class="col-4 text-muted">DID</div>
+                        <div class="col-8">@_activeCall.DidNumber</div>
+                    </div>
+                    @if (_activeCall.TrunkName != null)
+                    {
+                        <div class="row mb-1">
+                            <div class="col-4 text-muted">Trunk</div>
+                            <div class="col-8">@_activeCall.TrunkName (ch @_activeCall.TrunkChannel)</div>
+                        </div>
+                    }
+                    @if (_activeCall.VdnNumber != null)
+                    {
+                        <div class="row mb-1">
+                            <div class="col-4 text-muted">VDN</div>
+                            <div class="col-8">@_activeCall.VdnNumber</div>
+                        </div>
+                    }
+                    @if (_activeCall.CurrentPromptText != null)
+                    {
+                        <div class="row mb-1">
+                            <div class="col-4 text-muted">Prompt</div>
+                            <div class="col-8">
+                                <div class="prompt-bubble">@_activeCall.CurrentPromptText</div>
+                            </div>
+                        </div>
+                    }
+                    @if (_activeCall.AssignedAgentName != null)
+                    {
+                        <div class="row mb-1">
+                            <div class="col-4 text-muted">Agent</div>
+                            <div class="col-8">@_activeCall.AssignedAgentName</div>
+                        </div>
+                    }
+                    <div class="row mb-1">
+                        <div class="col-4 text-muted">Duration</div>
+                        <div class="col-8">@GetCallDuration(_activeCall)</div>
+                    </div>
+                </div>
+            </div>
+        }
+    </div>
+
+    @* ─── RIGHT: Call Trace ─── *@
+    <div class="col-md-7">
+        <div class="card bg-dark text-light" style="min-height: 500px;">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <span><i class="bi bi-list-ul me-1"></i> Call Event Trace</span>
+                @if (_activeCall != null)
+                {
+                    <span class="badge bg-secondary">@_activeCall.Events.Count events</span>
+                }
+            </div>
+            <div class="card-body p-0">
+                <div class="call-trace">
+                    @if (_activeCall != null)
+                    {
+                        @foreach (var evt in _activeCall.Events)
+                        {
+                            <div class="trace-entry">
+                                <span class="trace-time">@evt.Timestamp.ToString("HH:mm:ss.fff")</span>
+                                <span class="trace-source @GetSourceClass(evt.Source)">@evt.Source</span>
+                                <span class="trace-message">@evt.Message</span>
+                                @if (!string.IsNullOrEmpty(evt.Detail))
+                                {
+                                    <div class="trace-detail">@evt.Detail</div>
+                                }
+                            </div>
+                        }
+                    }
+                    else
+                    {
+                        <div class="p-3 text-muted text-center">
+                            <i class="bi bi-telephone-plus me-1"></i> Place a call to see the event trace
+                        </div>
+                    }
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@code {
+    private SimulatedCall? _activeCall;
+    private string _selectedCaller = "";
+    private string _selectedDid = "";
+    private string _speechText = "";
+
+    protected override void OnInitialized()
+    {
+        var callers = PstnService.GetCallers();
+        var dids = PstnService.GetDids();
+        if (callers.Any()) _selectedCaller = callers.First().Number;
+        if (dids.Any()) _selectedDid = dids.First().Number;
+
+        CallManager.OnCallUpdated += HandleCallUpdated;
+        CallManager.OnCallCompleted += HandleCallCompleted;
+    }
+
+    private async Task PlaceCall()
+    {
+        var caller = PstnService.GetCallers().FirstOrDefault(c => c.Number == _selectedCaller);
+        if (caller == null) return;
+
+        var did = PstnService.GetDids().FirstOrDefault(d => d.Number == _selectedDid);
+        if (did == null) return;
+
+        // Check for blocked callers
+        if (PstnService.IsCallerBlocked(_selectedCaller))
+        {
+            return;
+        }
+
+        // Create the call
+        var call = CallManager.CreateCall(caller, did);
+        _activeCall = call;
+
+        // 1. PSTN carrier delivers call to CM10 (seize inbound trunk)
+        var inbound = PstnService.SeizeInboundChannel(_selectedDid);
+        if (inbound == null)
+        {
+            CallManager.CompleteCall(call.Id, CallState.Failed, CallEventSource.Pstn, "Inbound carrier trunk full — cannot deliver call");
+            return;
+        }
+        call.TrunkName = inbound.Value.TrunkName;
+        call.TrunkChannel = inbound.Value.Channel;
+
+        CallManager.TransitionCall(call.Id, CallState.TrunkSeized, CallEventSource.Pstn,
+            $"PSTN → CM10: Carrier trunk {inbound.Value.TrunkName} channel {inbound.Value.Channel} seized");
+
+        // 2. CM10 VDN routing
+        var vdnNumber = PstnService.GetVdnForDid(_selectedDid);
+        if (vdnNumber != null)
+        {
+            call.VdnNumber = vdnNumber;
+            var routing = Cm10Service.RouteVdn(vdnNumber);
+            if (routing.Success)
+            {
+                CallManager.TransitionCall(call.Id, CallState.VdnRouting, CallEventSource.Cm10,
+                    $"VDN {vdnNumber} → {routing.VdnLabel}",
+                    $"Vector: {routing.VectorName}, Destination: {routing.Destination}");
+
+                if (routing.Destination == "IVR")
+                {
+                    // 3. CM10 routes outbound through gateway/SBC to ACS
+                    var outbound = PstnService.SeizeOutboundChannel();
+                    if (outbound == null)
+                    {
+                        CallManager.CompleteCall(call.Id, CallState.Failed, CallEventSource.Cm10,
+                            "CM10 → Gateway failed: no outbound gateway/trunk available (unregistered or full)");
+                        PstnService.ReleaseChannel(inbound.Value.TrunkName);
+                        return;
+                    }
+                    call.GatewayName = outbound.Value.GatewayName;
+
+                    CallManager.TransitionCall(call.Id, CallState.VdnRouting, CallEventSource.Cm10,
+                        $"CM10 → Gateway: Outbound trunk {outbound.Value.TrunkName} via {outbound.Value.GatewayName}",
+                        $"Gateway routes SIP to ACS via Direct Routing");
+
+                    // Route to IVR through ACS
+                    await AcsBridge.OriginateCallAsync(call);
+                }
+                else if (routing.Destination?.StartsWith("Queue:") == true)
+                {
+                    // Route directly to queue (bypass IVR)
+                    var queueName = routing.Destination[6..];
+                    CallManager.TransitionCall(call.Id, CallState.AcdQueued, CallEventSource.Cm10,
+                        $"Direct queue routing: {queueName}");
+                    var assignment = Cm10Service.AssignAgent(queueName);
+                    if (assignment != null)
+                    {
+                        call.AssignedAgentId = assignment.AgentId;
+                        call.AssignedAgentName = assignment.AgentName;
+                        CallManager.TransitionCall(call.Id, CallState.AgentConnected, CallEventSource.Agent,
+                            $"Agent {assignment.AgentName} connected");
+                    }
+                }
+            }
+            else
+            {
+                CallManager.TransitionCall(call.Id, CallState.VdnRouting, CallEventSource.Cm10,
+                    $"VDN {vdnNumber} routing failed", routing.Error);
+
+                // Still try to route to IVR via gateway
+                var outbound = PstnService.SeizeOutboundChannel();
+                if (outbound != null)
+                {
+                    call.GatewayName = outbound.Value.GatewayName;
+                    await AcsBridge.OriginateCallAsync(call);
+                }
+            }
+        }
+        else
+        {
+            // No VDN mapping — route directly to IVR via gateway
+            CallManager.TransitionCall(call.Id, CallState.VdnRouting, CallEventSource.Pstn,
+                "No VDN mapping — routing directly to IVR via gateway");
+
+            var outbound = PstnService.SeizeOutboundChannel();
+            if (outbound != null)
+            {
+                call.GatewayName = outbound.Value.GatewayName;
+                await AcsBridge.OriginateCallAsync(call);
+            }
+        }
+    }
+
+    private async Task HangUp()
+    {
+        if (_activeCall == null) return;
+        await AcsBridge.DisconnectAsync(_activeCall.Id);
+    }
+
+    private async Task SendDtmf(string key)
+    {
+        if (_activeCall == null) return;
+        await AcsBridge.SendDtmfAsync(_activeCall.Id, key);
+    }
+
+    private async Task SendSpeech()
+    {
+        if (_activeCall == null || string.IsNullOrWhiteSpace(_speechText)) return;
+        await AcsBridge.SendSpeechAsync(_activeCall.Id, _speechText);
+        _speechText = "";
+    }
+
+    private async Task HandleSpeechKeyDown(Microsoft.AspNetCore.Components.Web.KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter") await SendSpeech();
+    }
+
+    private void HandleCallUpdated(SimulatedCall call)
+    {
+        if (_activeCall?.Id == call.Id)
+        {
+            _activeCall = call;
+            InvokeAsync(StateHasChanged);
+        }
+    }
+
+    private void HandleCallCompleted(CallDetailRecord cdr)
+    {
+        if (_activeCall?.Id == cdr.CallId)
+        {
+            InvokeAsync(StateHasChanged);
+        }
+    }
+
+    private string GetCallDuration(SimulatedCall call)
+    {
+        var duration = DateTime.UtcNow - call.StartTime;
+        return $"{duration.Minutes:D2}:{duration.Seconds:D2}";
+    }
+
+    private string GetStateBadgeClass(CallState state) => state switch
+    {
+        CallState.IvrAnswered or CallState.IvrPlaying or CallState.IvrRecognizing => "bg-warning text-dark",
+        CallState.AgentConnected => "bg-success",
+        CallState.AcdQueued or CallState.AgentRinging => "bg-info",
+        CallState.Disconnected => "bg-secondary",
+        CallState.Failed => "bg-danger",
+        _ => "bg-primary"
+    };
+
+    private string GetSourceClass(CallEventSource source) => source switch
+    {
+        CallEventSource.Pstn => "source-pstn",
+        CallEventSource.Cm10 => "source-cm10",
+        CallEventSource.Ivr => "source-ivr",
+        CallEventSource.Acs => "source-acs",
+        CallEventSource.Agent => "source-agent",
+        _ => "source-system"
+    };
+
+    public void Dispose()
+    {
+        CallManager.OnCallUpdated -= HandleCallUpdated;
+        CallManager.OnCallCompleted -= HandleCallCompleted;
+    }
+}

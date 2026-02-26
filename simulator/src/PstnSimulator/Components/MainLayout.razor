@@ -1,0 +1,54 @@
+@inherits LayoutComponentBase
+
+<div class="d-flex" style="min-height: 100vh;">
+    <nav class="bg-dark text-white p-3" style="width: 240px; flex-shrink: 0;">
+        <h5 class="mb-4 text-center">
+            <i class="bi bi-telephone-fill me-2"></i>PSTN Simulator
+        </h5>
+        <ul class="nav flex-column">
+            <li class="nav-item">
+                <NavLink class="nav-link text-white" href="/" Match="NavLinkMatch.All">
+                    <i class="bi bi-phone me-2"></i>Phone
+                </NavLink>
+            </li>
+            <li class="nav-item">
+                <NavLink class="nav-link text-white" href="/call-monitor">
+                    <i class="bi bi-activity me-2"></i>Call Monitor
+                </NavLink>
+            </li>
+            <li class="nav-item">
+                <NavLink class="nav-link text-white" href="/cm10-admin">
+                    <i class="bi bi-diagram-3 me-2"></i>CM10 Admin
+                </NavLink>
+            </li>
+            <li class="nav-item">
+                <NavLink class="nav-link text-white" href="/agent-console">
+                    <i class="bi bi-headset me-2"></i>Agent Console
+                </NavLink>
+            </li>
+        </ul>
+        <hr class="border-secondary" />
+        <div class="small text-secondary px-2">
+            <div>Mode: <span class="text-info">@_acsMode</span></div>
+            <div>IVR: <span class="text-info">@_ivrEndpoint</span></div>
+        </div>
+    </nav>
+    <main class="flex-grow-1 bg-light">
+        <div class="p-4">
+            @Body
+        </div>
+    </main>
+</div>
+
+@code {
+    [Inject] private IConfiguration Config { get; set; } = default!;
+
+    private string _acsMode = "Mock";
+    private string _ivrEndpoint = "";
+
+    protected override void OnInitialized()
+    {
+        _acsMode = Config["AcsMode"] ?? "Mock";
+        _ivrEndpoint = Config["IvrEndpoint"] ?? "http://localhost:7071";
+    }
+}
