@@ -16,7 +16,8 @@ resource communicationService 'Microsoft.Communication/communicationServices@202
   location: location
   tags: tags
   properties: {
-    dataLocation: 'unitedstates'
+    // Use 'usgov' for Azure Government, 'unitedstates' for commercial Azure
+    dataLocation: environment().name == 'AzureUSGovernment' ? 'usgov' : 'unitedstates'
   }
 }
 
