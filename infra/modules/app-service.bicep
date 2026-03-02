@@ -59,7 +59,7 @@ resource appService 'Microsoft.Web/sites@2023-12-01' = {
         { name: 'APPLICATIONINSIGHTS_CONNECTION_STRING', value: appInsightsConnectionString }
         { name: 'AzureAd__TenantId', value: azureAdTenantId }
         { name: 'AzureAd__ClientId', value: azureAdClientId }
-        { name: 'AzureAd__Instance', value: 'https://login.microsoftonline.com/' }
+        { name: 'AzureAd__Instance', value: environment().authentication.loginEndpoint }
         { name: 'AzureAd__CallbackPath', value: '/signin-oidc' }
       ]
       ftpsState: 'Disabled'
