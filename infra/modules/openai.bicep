@@ -12,13 +12,13 @@ param location string
 param tags object
 
 @description('OpenAI model deployment name')
-param deploymentName string = 'gpt-4o'
+param deploymentName string = 'gpt-41'
 
 @description('OpenAI model name')
-param modelName string = 'gpt-4o'
+param modelName string = 'gpt-4.1'
 
 @description('OpenAI model version')
-param modelVersion string = '2024-08-06'
+param modelVersion string = '2025-04-14'
 
 resource openAIAccount 'Microsoft.CognitiveServices/accounts@2023-10-01-preview' = {
   name: name

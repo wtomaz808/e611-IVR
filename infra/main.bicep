@@ -63,18 +63,17 @@ module cognitiveServices 'modules/cognitive-services.bicep' = {
 }
 
 // ─── Azure OpenAI (Transcript Intent Classification) ────────────
-// NOTE: Commented out for Azure Government - GPT-4o not yet available
-// The system will work without AI routing, using DTMF menus instead
-// Uncomment when Azure OpenAI models become available in Azure Gov
-/*
+// Using gpt-4.1 model (version 2025-04-14) available in Azure Government
 module openAI 'modules/openai.bicep' = {
   params: {
     name: '${namePrefix}-openai-${uniqueSuffix}'
     location: location
     tags: tags
+    deploymentName: 'gpt-41'
+    modelName: 'gpt-4.1'
+    modelVersion: '2025-04-14'
   }
 }
-*/
 
 // ─── Application Insights ───────────────────────────────────────
 module appInsights 'modules/app-insights.bicep' = {
@@ -98,9 +97,9 @@ module functionApp 'modules/function-app.bicep' = {
     acsConnectionString: communicationServices.outputs.connectionString
     cognitiveServicesEndpoint: cognitiveServices.outputs.endpoint
     cognitiveServicesKey: cognitiveServices.outputs.primaryKey
-    openAIEndpoint: '' // Azure OpenAI not available in Azure Gov yet
-    openAIKey: ''
-    openAIDeploymentName: ''
+    openAIEndpoint: openAI.outputs.endpoint
+    openAIKey: openAI.outputs.primaryKey
+    openAIDeploymentName: openAI.outputs.deploymentName
   }
 }
 
