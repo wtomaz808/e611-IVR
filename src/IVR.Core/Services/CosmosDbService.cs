@@ -153,7 +153,7 @@ public class CosmosDbService : ICosmosDbService
     {
         var results = new List<IvrMenu>();
         using var iterator = _menuContainer.GetItemQueryIterator<IvrMenu>(
-            new QueryDefinition("SELECT * FROM c ORDER BY c.order"));
+            new QueryDefinition("SELECT * FROM c ORDER BY c[\"order\"]"));
 
         while (iterator.HasMoreResults)
         {
