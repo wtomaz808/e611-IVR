@@ -1,0 +1,372 @@
+@page "/teams"
+@using IVR.Core.Interfaces
+@using IVR.Core.Models
+@inject ICosmosDbService CosmosDb
+@inject IJSRuntime JS
+
+<PageTitle>Team Routing — IVR Admin</PageTitle>
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+        <h3 class="mb-1"><i class="bi bi-people-fill me-2"></i>Team Routing</h3>
+        <p class="text-muted mb-0">Configure AI-powered speech routing to Teams call queues</p>
+    </div>
+    <button class="btn btn-primary" @onclick="ShowCreateModal">
+        <i class="bi bi-plus-circle me-1"></i> Add Team
+    </button>
+</div>
+
+@if (_loading)
+{
+    <div class="text-center py-5">
+        <div class="spinner-border text-primary" role="status">
+            <span class="visually-hidden">Loading...</span>
+        </div>
+        <p class="mt-2 text-muted">Loading teams...</p>
+    </div>
+}
+else if (_teams.Count == 0)
+{
+    <div class="card border-0 shadow-sm">
+        <div class="card-body text-center py-5">
+            <i class="bi bi-people text-muted" style="font-size: 3rem;"></i>
+            <h5 class="mt-3">No Teams Configured</h5>
+            <p class="text-muted">
+                Team Routing enables AI-powered intent classification using Azure OpenAI.<br />
+                Add teams to route callers based on natural language descriptions of their needs.
+            </p>
+            <button class="btn btn-primary mt-2" @onclick="ShowCreateModal">
+                <i class="bi bi-plus-circle me-1"></i> Add Your First Team
+            </button>
+        </div>
+    </div>
+}
+else
+{
+    <div class="row g-3">
+        @foreach (var team in _teams.OrderByDescending(t => t.Priority).ThenBy(t => t.TeamName))
+        {
+            <div class="col-md-6 col-lg-4">
+                <div class="card border-0 shadow-sm h-100 @(!team.IsActive ? "opacity-75" : "")">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between align-items-start mb-2">
+                            <div>
+                                <h5 class="card-title mb-1">
+                                    @team.TeamName
+                                    @if (!team.IsActive)
+                                    {
+                                        <span class="badge bg-secondary ms-2">Inactive</span>
+                                    }
+                                </h5>
+                                <small class="text-muted">Priority: @team.Priority</small>
+                            </div>
+                            <div class="dropdown">
+                                <button class="btn btn-sm btn-link text-muted" type="button" data-bs-toggle="dropdown">
+                                    <i class="bi bi-three-dots-vertical"></i>
+                                </button>
+                                <ul class="dropdown-menu dropdown-menu-end">
+                                    <li><a class="dropdown-item" href="#" @onclick="() => ShowEditModal(team)" @onclick:preventDefault>
+                                        <i class="bi bi-pencil me-2"></i>Edit
+                                    </a></li>
+                                    <li><hr class="dropdown-divider" /></li>
+                                    <li><a class="dropdown-item text-danger" href="#" @onclick="() => DeleteTeam(team)" @onclick:preventDefault>
+                                        <i class="bi bi-trash me-2"></i>Delete
+                                    </a></li>
+                                </ul>
+                            </div>
+                        </div>
+                        
+                        @if (!string.IsNullOrEmpty(team.Description))
+                        {
+                            <p class="card-text text-muted small mb-2">@team.Description</p>
+                        }
+                        
+                        <hr class="my-2" />
+                        
+                        <div class="small">
+                            <div class="mb-1">
+                                <i class="bi bi-telephone me-1 text-primary"></i>
+                                <strong>Transfer:</strong> @team.TransferNumber
+                            </div>
+                            @if (!string.IsNullOrEmpty(team.QueueName))
+                            {
+                                <div class="mb-1">
+                                    <i class="bi bi-list-ul me-1 text-success"></i>
+                                    <strong>Queue:</strong> @team.QueueName
+                                </div>
+                            }
+                            @if (team.IntentKeywords.Any())
+                            {
+                                <div class="mt-2">
+                                    <strong class="d-block mb-1">Keywords:</strong>
+                                    <div>
+                                        @foreach (var keyword in team.IntentKeywords.Take(5))
+                                        {
+                                            <span class="badge bg-light text-dark me-1 mb-1">@keyword</span>
+                                        }
+                                        @if (team.IntentKeywords.Count > 5)
+                                        {
+                                            <span class="badge bg-light text-muted">+@(team.IntentKeywords.Count - 5) more</span>
+                                        }
+                                    </div>
+                                </div>
+                            }
+                        </div>
+                    </div>
+                </div>
+            </div>
+        }
+    </div>
+}
+
+@* ─── Create/Edit Modal ─────────────────────────────────────── *@
+@if (_showModal && _editingTeam != null)
+{
+    <div class="modal show d-block" tabindex="-1" style="background: rgba(0,0,0,0.5);">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">
+                        @(_isNewTeam ? "Add New Team" : $"Edit {_editingTeam.TeamName}")
+                    </h5>
+                    <button type="button" class="btn-close" @onclick="CloseModal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="row g-3">
+                        <div class="col-md-8">
+                            <label class="form-label">Team Name <span class="text-danger">*</span></label>
+                            <input type="text" class="form-control" @bind="_editingTeam.TeamName" 
+                                placeholder="e.g., Fire Safety Team" />
+                            <small class="text-muted">This name is used for AI intent classification</small>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Priority</label>
+                            <input type="number" class="form-control" @bind="_editingTeam.Priority" 
+                                min="1" max="100" />
+                            <small class="text-muted">Higher = preferred</small>
+                        </div>
+                        
+                        <div class="col-12">
+                            <label class="form-label">Description</label>
+                            <textarea class="form-control" rows="2" @bind="_editingTeam.Description"
+                                placeholder="Describe what issues this team handles (used by AI for classification)"></textarea>
+                            <small class="text-muted">Example: "Fire alarms, sprinklers, smoke detectors, emergency evacuation"</small>
+                        </div>
+                        
+                        <div class="col-md-6">
+                            <label class="form-label">Transfer Number <span class="text-danger">*</span></label>
+                            <input type="text" class="form-control" @bind="_editingTeam.TransferNumber"
+                                placeholder="+18005551234 or sip:user@domain.com" />
+                            <small class="text-muted">Phone number or SIP URI</small>
+                        </div>
+                        
+                        <div class="col-md-6">
+                            <label class="form-label">Queue Name (Optional)</label>
+                            <input type="text" class="form-control" @bind="_editingTeam.QueueName"
+                                placeholder="e.g., Fire Safety Queue" />
+                            <small class="text-muted">Teams call queue identifier</small>
+                        </div>
+                        
+                        <div class="col-12">
+                            <label class="form-label">Intent Keywords</label>
+                            <input type="text" class="form-control mb-2" @bind="_newKeyword" 
+                                placeholder="Enter keyword and press Enter"
+                                @onkeydown="HandleKeywordKeyPress" />
+                            <small class="text-muted d-block mb-2">Examples: fire, alarm, sprinkler, emergency</small>
+                            <div>
+                                @foreach (var keyword in _editingTeam.IntentKeywords)
+                                {
+                                    <span class="badge bg-primary me-1 mb-1">
+                                        @keyword
+                                        <button type="button" class="btn-close btn-close-white ms-1" 
+                                            style="font-size: 0.6rem;" 
+                                            @onclick="() => RemoveKeyword(keyword)"></button>
+                                    </span>
+                                }
+                            </div>
+                        </div>
+                        
+                        <div class="col-md-6">
+                            <label class="form-label">Confirmation Prompt (Optional)</label>
+                            <select class="form-select" @bind="_editingTeam.ConfirmationPromptId">
+                                <option value="">-- None --</option>
+                                @foreach (var prompt in _prompts)
+                                {
+                                    <option value="@prompt.Id">@prompt.Name</option>
+                                }
+                            </select>
+                            <small class="text-muted">Played before transferring</small>
+                        </div>
+                        
+                        <div class="col-md-6">
+                            <label class="form-label">Status</label>
+                            <div class="form-check form-switch mt-2">
+                                <input class="form-check-input" type="checkbox" @bind="_editingTeam.IsActive" />
+                                <label class="form-check-label">Active</label>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" @onclick="CloseModal">Cancel</button>
+                    <button type="button" class="btn btn-primary" @onclick="SaveTeam" disabled="@_saving">
+                        @if (_saving)
+                        {
+                            <span class="spinner-border spinner-border-sm me-1"></span>
+                        }
+                        @(_isNewTeam ? "Create Team" : "Save Changes")
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    private List<TeamRoutingConfig> _teams = new();
+    private List<IvrPrompt> _prompts = new();
+    private bool _loading = true;
+    private bool _showModal = false;
+    private bool _saving = false;
+    private bool _isNewTeam = false;
+    private TeamRoutingConfig? _editingTeam;
+    private string _newKeyword = string.Empty;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadTeams();
+        await LoadPrompts();
+    }
+
+    private async Task LoadTeams()
+    {
+        _loading = true;
+        try
+        {
+            _teams = await CosmosDb.GetAllActiveTeamRoutingConfigsAsync();
+        }
+        catch (Exception ex)
+        {
+            await JS.InvokeVoidAsync("alert", $"Error loading teams: {ex.Message}");
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private async Task LoadPrompts()
+    {
+        try
+        {
+            _prompts = await CosmosDb.GetAllPromptsAsync();
+        }
+        catch { }
+    }
+
+    private void ShowCreateModal()
+    {
+        _editingTeam = new TeamRoutingConfig
+        {
+            Priority = 10,
+            IsActive = true
+        };
+        _isNewTeam = true;
+        _showModal = true;
+    }
+
+    private void ShowEditModal(TeamRoutingConfig team)
+    {
+        _editingTeam = new TeamRoutingConfig
+        {
+            Id = team.Id,
+            TeamName = team.TeamName,
+            Description = team.Description,
+            TransferNumber = team.TransferNumber,
+            QueueName = team.QueueName,
+            IntentKeywords = new List<string>(team.IntentKeywords),
+            ConfirmationPromptId = team.ConfirmationPromptId,
+            Priority = team.Priority,
+            IsActive = team.IsActive,
+            CreatedAt = team.CreatedAt
+        };
+        _isNewTeam = false;
+        _showModal = true;
+    }
+
+    private void CloseModal()
+    {
+        _showModal = false;
+        _editingTeam = null;
+        _newKeyword = string.Empty;
+    }
+
+    private async Task SaveTeam()
+    {
+        if (_editingTeam == null) return;
+
+        if (string.IsNullOrWhiteSpace(_editingTeam.TeamName))
+        {
+            await JS.InvokeVoidAsync("alert", "Team name is required");
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(_editingTeam.TransferNumber))
+        {
+            await JS.InvokeVoidAsync("alert", "Transfer number is required");
+            return;
+        }
+
+        _saving = true;
+        try
+        {
+            _editingTeam.UpdatedAt = DateTime.UtcNow;
+            await CosmosDb.UpsertTeamRoutingConfigAsync(_editingTeam);
+            await LoadTeams();
+            CloseModal();
+        }
+        catch (Exception ex)
+        {
+            await JS.InvokeVoidAsync("alert", $"Error saving team: {ex.Message}");
+        }
+        finally
+        {
+            _saving = false;
+        }
+    }
+
+    private async Task DeleteTeam(TeamRoutingConfig team)
+    {
+        var confirmed = await JS.InvokeAsync<bool>("confirm", 
+            $"Are you sure you want to delete '{team.TeamName}'? This cannot be undone.");
+        
+        if (!confirmed) return;
+
+        try
+        {
+            await CosmosDb.DeleteTeamRoutingConfigAsync(team.Id);
+            await LoadTeams();
+        }
+        catch (Exception ex)
+        {
+            await JS.InvokeVoidAsync("alert", $"Error deleting team: {ex.Message}");
+        }
+    }
+
+    private void HandleKeywordKeyPress(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter" && !string.IsNullOrWhiteSpace(_newKeyword) && _editingTeam != null)
+        {
+            if (!_editingTeam.IntentKeywords.Contains(_newKeyword.Trim(), StringComparer.OrdinalIgnoreCase))
+            {
+                _editingTeam.IntentKeywords.Add(_newKeyword.Trim().ToLower());
+                _newKeyword = string.Empty;
+            }
+        }
+    }
+
+    private void RemoveKeyword(string keyword)
+    {
+        _editingTeam?.IntentKeywords.Remove(keyword);
+    }
+}
