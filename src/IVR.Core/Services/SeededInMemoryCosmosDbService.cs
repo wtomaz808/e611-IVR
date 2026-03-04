@@ -78,6 +78,20 @@ public class SeededInMemoryCosmosDbService : ICosmosDbService
             },
             new()
             {
+                Id = "prompt-goodbye",
+                Name = "Goodbye Message",
+                Description = "Played when caller disconnects or hangs up",
+                Type = PromptType.Tts,
+                TtsText = "Thank you for calling. Goodbye.",
+                TtsVoice = "en-US-JennyNeural",
+                Language = "en-US",
+                Category = "Greeting",
+                Tags = new List<string> { "goodbye", "hangup", "disconnect" },
+                IsActive = true,
+                CreatedAt = DateTime.UtcNow.AddDays(-30)
+            },
+            new()
+            {
                 Id = "prompt-lamas-area",
                 Name = "LAMAS Area Selection",
                 Description = "Alarm Administrator — select affected LAMAS area",
@@ -241,20 +255,6 @@ public class SeededInMemoryCosmosDbService : ICosmosDbService
                 Language = "en-US",
                 Category = "Greeting",
                 Tags = new List<string> { "afterhours", "e911" },
-                IsActive = true,
-                CreatedAt = DateTime.UtcNow.AddDays(-30)
-            },
-            new()
-            {
-                Id = "prompt-goodbye",
-                Name = "Goodbye",
-                Description = "Call ending message",
-                Type = PromptType.Tts,
-                TtsText = "Thank you for calling. If you experience a fire alarm issue, do not hesitate to call back. Goodbye.",
-                TtsVoice = "en-US-JennyNeural",
-                Language = "en-US",
-                Category = "System",
-                Tags = new List<string> { "goodbye", "end" },
                 IsActive = true,
                 CreatedAt = DateTime.UtcNow.AddDays(-30)
             },
@@ -1092,7 +1092,7 @@ public class SeededInMemoryCosmosDbService : ICosmosDbService
             DefaultCm10Vdn = "70100",
             Cm10SbcFqdn = "sbc.yourdomain.com",
             Cm10SbcPort = 5061,
-            Cm10TransferPromptId = "prompt-emergency-transfer"
+            Cm10TransferPromptId = "prompt-goodbye"
         };
     }
 

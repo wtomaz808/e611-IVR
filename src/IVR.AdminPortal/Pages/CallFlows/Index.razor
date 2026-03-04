@@ -2,11 +2,15 @@
 @using IVR.Core.Interfaces
 @using IVR.Core.Models
 @inject ICosmosDbService CosmosDb
+@inject IJSRuntime JS
 
 <PageTitle>Call Flows — IVR Admin</PageTitle>
 
 <div class="d-flex justify-content-between align-items-center mb-4">
-    <h3><i class="bi bi-diagram-3 me-2"></i>Call Flow Builder</h3>
+    <div>
+        <h3 class="mb-1"><i class="bi bi-diagram-3 me-2"></i>Call Flow Builder</h3>
+        <p class="text-muted mb-0">Design IVR menu trees with DTMF keypad or speech recognition</p>
+    </div>
     <button class="btn btn-primary" @onclick="ShowCreateDialog">
         <i class="bi bi-plus-lg me-1"></i>New Menu
     </button>

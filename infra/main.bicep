@@ -117,6 +117,18 @@ module appService 'modules/app-service.bicep' = {
   }
 }
 
+// ─── App Service (PSTN Simulator) ───────────────────────────────
+module simulatorApp 'modules/simulator-app.bicep' = {
+  params: {
+    name: '${namePrefix}-simulator-${uniqueSuffix}'
+    location: location
+    tags: tags
+    appServicePlanId: appService.outputs.planId
+    ivrEndpoint: 'https://${functionApp.outputs.defaultHostname}'
+    acsMode: 'Mock'  // Use Mock mode by default for testing
+  }
+}
+
 // ─── Tags ───────────────────────────────────────────────────────
 var tags = {
   environment: environmentName
@@ -130,6 +142,9 @@ output functionAppUrl string = functionApp.outputs.defaultHostname
 
 @description('Admin Portal URL')
 output adminPortalUrl string = appService.outputs.defaultHostname
+
+@description('PSTN Simulator URL')
+output simulatorUrl string = simulatorApp.outputs.defaultHostname
 
 @description('Communication Services resource ID')
 output acsResourceId string = communicationServices.outputs.resourceId

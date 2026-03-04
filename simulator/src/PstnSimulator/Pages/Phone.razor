@@ -6,6 +6,7 @@
 @inject PstnService PstnService
 @inject Cm10Service Cm10Service
 @inject IConfiguration Config
+@inject IJSRuntime JS
 @implements IDisposable
 
 <h3 class="mb-3"><i class="bi bi-telephone-fill me-2"></i>Phone Simulator</h3>
@@ -66,15 +67,26 @@
 
                 @* ─── Speech Input ─── *@
                 <div class="mb-3">
-                    <label class="form-label small text-muted">Speech Input</label>
+                    <label class="form-label small text-muted">Speech Input (Alternative to DTMF)</label>
                     <div class="input-group input-group-sm">
                         <input type="text" class="form-control bg-dark text-light" placeholder="Speak to the IVR…"
                                @bind="_speechText" @bind:event="oninput" @onkeydown="HandleSpeechKeyDown"
-                               disabled="@(_activeCall == null || _activeCall.State != CallState.IvrRecognizing || _activeCall.RecognizeType != "speech")" />
+                               disabled="@(_activeCall == null || _activeCall.State != CallState.IvrRecognizing)" />
                         <button class="btn btn-outline-info" @onclick="SendSpeech"
                                 disabled="@(string.IsNullOrWhiteSpace(_speechText) || _activeCall == null || _activeCall.State != CallState.IvrRecognizing)">
                             <i class="bi bi-mic-fill"></i>
                         </button>
+                    </div>
+                    <div class="form-text text-muted small">Type what you would say and press Enter or click the mic button</div>
+                </div>
+
+                @* ─── Audio Controls ─── *@
+                <div class="mb-3">
+                    <div class="form-check form-switch">
+                        <input class="form-check-input" type="checkbox" id="audioEnabled" @bind="_audioEnabled">
+                        <label class="form-check-label small text-muted" for="audioEnabled">
+                            <i class="bi bi-volume-up-fill me-1"></i> Enable Audio Prompts (Text-to-Speech)
+                        </label>
                     </div>
                 </div>
             </div>
@@ -184,6 +196,8 @@
     private string _selectedCaller = "";
     private string _selectedDid = "";
     private string _speechText = "";
+    private bool _audioEnabled = true;
+    private string? _lastSpokenPrompt = null;
 
     protected override void OnInitialized()
     {
@@ -191,6 +205,10 @@
         var dids = PstnService.GetDids();
         if (callers.Any()) _selectedCaller = callers.First().Number;
         if (dids.Any()) _selectedDid = dids.First().Number;
+
+        // Restore active call if one exists (for page navigation)
+        var activeCalls = CallManager.GetActiveCalls();
+        _activeCall = activeCalls.FirstOrDefault();
 
         CallManager.OnCallUpdated += HandleCallUpdated;
         CallManager.OnCallCompleted += HandleCallCompleted;
@@ -333,6 +351,20 @@
         if (_activeCall?.Id == call.Id)
         {
             _activeCall = call;
+
+            // Speak new prompts when audio is enabled
+            if (_audioEnabled && !string.IsNullOrEmpty(call.CurrentPromptText) && call.CurrentPromptText != _lastSpokenPrompt)
+            {
+                _lastSpokenPrompt = call.CurrentPromptText;
+                _ = SpeakPromptAsync(call.CurrentPromptText);
+            }
+
+            // Auto-clear call when it's disconnected or failed
+            if (call.State == CallState.Disconnected || call.State == CallState.Failed)
+            {
+                _activeCall = null;
+            }
+
             InvokeAsync(StateHasChanged);
         }
     }
@@ -341,6 +373,7 @@
     {
         if (_activeCall?.Id == cdr.CallId)
         {
+            _activeCall = null;
             InvokeAsync(StateHasChanged);
         }
     }
@@ -370,6 +403,20 @@
         CallEventSource.Agent => "source-agent",
         _ => "source-system"
     };
+
+    private async Task SpeakPromptAsync(string text)
+    {
+        try
+        {
+            // Use JavaScript Interop to trigger Web Speech API
+            await JS.InvokeVoidAsync("speakText", text);
+        }
+        catch (Exception ex)
+        {
+            // Silently fail if speech synthesis is not available
+            Console.WriteLine($"Speech synthesis error: {ex.Message}");
+        }
+    }
 
     public void Dispose()
     {

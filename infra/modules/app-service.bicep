@@ -73,3 +73,6 @@ output defaultHostname string = 'https://${appService.properties.defaultHostName
 
 @description('App Service resource ID')
 output resourceId string = appService.id
+
+@description('App Service Plan resource ID')
+output planId string = appServicePlan.id
