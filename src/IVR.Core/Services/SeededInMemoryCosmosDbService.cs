@@ -52,9 +52,9 @@ public class SeededInMemoryCosmosDbService : ICosmosDbService
             {
                 Id = "prompt-welcome",
                 Name = "E911 Admin Line Welcome",
-                Description = "Main E911 admin line welcome — fire alarm maintenance company",
+                Description = "Main E911 admin line welcome",
                 Type = PromptType.Tts,
-                TtsText = "Thank you for calling the E 9 1 1 administration line. If this is an emergency, press 1 to be transferred to the Remote Dispatch Center immediately. For fire alarm inspection scheduling, press 2. For maintenance and repair status, press 3. For account and billing inquiries, press 4. To speak with an operator, press 0.",
+                TtsText = "Thank you for calling the E 9 1 1 administration line. If this is an emergency, press 1 to be transferred to the R D C dispatcher immediately. To reach an Alarm Administrator, press 2. To reach a Fire Dispatcher, press 3. To reach a Police Dispatcher, press 4.",
                 TtsVoice = "en-US-JennyNeural",
                 Language = "en-US",
                 Category = "Greeting",
@@ -78,43 +78,141 @@ public class SeededInMemoryCosmosDbService : ICosmosDbService
             },
             new()
             {
-                Id = "prompt-inspection",
-                Name = "Inspection Scheduling Menu",
-                Description = "Fire alarm inspection scheduling menu",
+                Id = "prompt-lamas-area",
+                Name = "LAMAS Area Selection",
+                Description = "Alarm Administrator — select affected LAMAS area",
                 Type = PromptType.Tts,
-                TtsText = "For fire alarm inspection scheduling: To schedule a new inspection, press 1. To reschedule an existing appointment, press 2. To confirm an upcoming inspection, press 3. To return to the main menu, press 9.",
+                TtsText = "Choose the affected LAMAS area. For Joint Base Pearl Harbor, press 1. For Hickam, press 2. For West Loch, press 3. For N C TAMS, press 4. For P M R F, press 5.",
                 TtsVoice = "en-US-JennyNeural",
                 Language = "en-US",
                 Category = "Menu",
-                Tags = new List<string> { "inspection", "scheduling", "fire-alarm" },
+                Tags = new List<string> { "lamas", "alarm", "administrator" },
                 IsActive = true,
                 CreatedAt = DateTime.UtcNow.AddDays(-28)
             },
             new()
             {
-                Id = "prompt-maintenance",
-                Name = "Maintenance & Repair Menu",
-                Description = "Fire alarm maintenance and repair status menu",
+                Id = "prompt-fire-department",
+                Name = "Fire Dispatcher Department",
+                Description = "Fire Dispatcher — select department",
                 Type = PromptType.Tts,
-                TtsText = "For maintenance and repair: To report a fire alarm malfunction, press 1. To check on an open work order, press 2. For panel replacement or upgrade inquiries, press 3. To return to the main menu, press 9.",
+                TtsText = "Which fire department? For Fed Fire, press 1. For P M R F, press 2.",
                 TtsVoice = "en-US-JennyNeural",
                 Language = "en-US",
                 Category = "Menu",
-                Tags = new List<string> { "maintenance", "repair", "fire-alarm" },
+                Tags = new List<string> { "fire", "dispatcher", "department" },
                 IsActive = true,
                 CreatedAt = DateTime.UtcNow.AddDays(-28)
             },
             new()
             {
-                Id = "prompt-billing",
-                Name = "Account & Billing Menu",
-                Description = "Account and billing inquiries",
+                Id = "prompt-police-department",
+                Name = "Police Dispatcher Department",
+                Description = "Police Dispatcher — select department",
                 Type = PromptType.Tts,
-                TtsText = "For account and billing: To check your account balance, press 1. To make a payment, press 2. To request a copy of your inspection report, press 3. To return to the main menu, press 9.",
+                TtsText = "Which police department? For Joint Base Police, press 1. For P M R F, press 2.",
                 TtsVoice = "en-US-JennyNeural",
                 Language = "en-US",
                 Category = "Menu",
-                Tags = new List<string> { "billing", "account" },
+                Tags = new List<string> { "police", "dispatcher", "department" },
+                IsActive = true,
+                CreatedAt = DateTime.UtcNow.AddDays(-28)
+            },
+            new()
+            {
+                Id = "prompt-alarm-select",
+                Name = "Alarm Selection",
+                Description = "Alarm Administrator — select which alarm",
+                Type = PromptType.Tts,
+                TtsText = "Which alarm is this regarding? For Fire Alarm, press 1. For Intrusion Alarm, press 2. For Duress Alarm, press 3. For Supervisory Alarm, press 4. For Environmental Alarm, press 5.",
+                TtsVoice = "en-US-JennyNeural",
+                Language = "en-US",
+                Category = "Menu",
+                Tags = new List<string> { "alarm", "select", "type" },
+                IsActive = true,
+                CreatedAt = DateTime.UtcNow.AddDays(-28)
+            },
+            new()
+            {
+                Id = "prompt-alarm-status",
+                Name = "Alarm Status Selection",
+                Description = "Alarm Administrator — will the alarms be in inspection, test, or maintenance?",
+                Type = PromptType.Tts,
+                TtsText = "Will this alarm be in inspection, test, or maintenance? For Inspection, press 1. For Test, press 2. For Maintenance, press 3.",
+                TtsVoice = "en-US-JennyNeural",
+                Language = "en-US",
+                Category = "Menu",
+                Tags = new List<string> { "alarm", "status", "inspection", "test", "maintenance" },
+                IsActive = true,
+                CreatedAt = DateTime.UtcNow.AddDays(-28)
+            },
+            new()
+            {
+                Id = "prompt-alarm-submitted",
+                Name = "Alarm Information Submitted",
+                Description = "Confirmation that alarm information has been submitted",
+                Type = PromptType.Tts,
+                TtsText = "Thank you. Your information has been submitted. Goodbye.",
+                TtsVoice = "en-US-JennyNeural",
+                Language = "en-US",
+                Category = "Confirmation",
+                Tags = new List<string> { "alarm", "submitted", "confirmation" },
+                IsActive = true,
+                CreatedAt = DateTime.UtcNow.AddDays(-25)
+            },
+            new()
+            {
+                Id = "prompt-fire-reason",
+                Name = "Fire Dispatch — Reason for Call",
+                Description = "Non-emergency fire dispatch — reason for call",
+                Type = PromptType.Tts,
+                TtsText = "This is the non-emergency fire line. How can we help? For a burn permit request, press 1. For fire prevention or inspection, press 2. For community outreach or education, press 3. For an incident report request, press 4. For a general inquiry, press 5.",
+                TtsVoice = "en-US-JennyNeural",
+                Language = "en-US",
+                Category = "Menu",
+                Tags = new List<string> { "fire", "non-emergency", "reason" },
+                IsActive = true,
+                CreatedAt = DateTime.UtcNow.AddDays(-28)
+            },
+            new()
+            {
+                Id = "prompt-police-reason",
+                Name = "Police Dispatch — Reason for Call",
+                Description = "Non-emergency police dispatch — reason for call",
+                Type = PromptType.Tts,
+                TtsText = "This is the non-emergency police line. How can we help? To file a report, press 1. For a traffic or parking concern, press 2. For lost or found property, press 3. For a noise complaint, press 4. For a general inquiry, press 5.",
+                TtsVoice = "en-US-JennyNeural",
+                Language = "en-US",
+                Category = "Menu",
+                Tags = new List<string> { "police", "non-emergency", "reason" },
+                IsActive = true,
+                CreatedAt = DateTime.UtcNow.AddDays(-28)
+            },
+            new()
+            {
+                Id = "prompt-transfer-fire",
+                Name = "Transfer to Fire Dispatcher",
+                Description = "Played before transferring to a fire dispatcher",
+                Type = PromptType.Tts,
+                TtsText = "Please hold while we connect you to the Fire Dispatcher.",
+                TtsVoice = "en-US-JennyNeural",
+                Language = "en-US",
+                Category = "Transfer",
+                Tags = new List<string> { "transfer", "fire", "dispatcher" },
+                IsActive = true,
+                CreatedAt = DateTime.UtcNow.AddDays(-25)
+            },
+            new()
+            {
+                Id = "prompt-transfer-police",
+                Name = "Transfer to Police Dispatcher",
+                Description = "Played before transferring to a police dispatcher",
+                Type = PromptType.Tts,
+                TtsText = "Please hold while we connect you to the Police Dispatcher.",
+                TtsVoice = "en-US-JennyNeural",
+                Language = "en-US",
+                Category = "Transfer",
+                Tags = new List<string> { "transfer", "police", "dispatcher" },
                 IsActive = true,
                 CreatedAt = DateTime.UtcNow.AddDays(-25)
             },
@@ -208,152 +306,11 @@ public class SeededInMemoryCosmosDbService : ICosmosDbService
                 Name = "Speech Routing",
                 Description = "AI speech routing for E911 admin",
                 Type = PromptType.Tts,
-                TtsText = "Please briefly describe the reason for your call — for example, schedule an inspection, report a malfunction, or check on a work order.",
+                TtsText = "Please briefly describe the reason for your call — for example, I need a fire dispatcher, or I need an alarm administrator.",
                 TtsVoice = "en-US-JennyNeural",
                 Language = "en-US",
                 Category = "Speech",
                 Tags = new List<string> { "speech", "ai", "routing" },
-                IsActive = true,
-                CreatedAt = DateTime.UtcNow.AddDays(-10)
-            },
-            new()
-            {
-                Id = "prompt-alarm-malfunction",
-                Name = "Alarm Malfunction Reported",
-                Description = "Confirmation when a fire alarm malfunction is reported",
-                Type = PromptType.Tts,
-                TtsText = "Thank you. A fire alarm malfunction has been logged. A technician will be dispatched. If this is a life safety emergency, please hang up and dial 9 1 1.",
-                TtsVoice = "en-US-JennyNeural",
-                Language = "en-US",
-                Category = "Confirmation",
-                Tags = new List<string> { "malfunction", "alarm", "workorder" },
-                IsActive = true,
-                CreatedAt = DateTime.UtcNow.AddDays(-20)
-            },
-            // ─── Data-collection prompts for multi-step flows ───
-            new()
-            {
-                Id = "prompt-identify-property",
-                Name = "Identify Property",
-                Description = "Asks caller to identify which property this is regarding",
-                Type = PromptType.Tts,
-                TtsText = "Which property is this regarding? For Oakwood Office Park, press 1. For Sunrise Senior Living, press 2. For Hilltop Apartments, press 3. For County 9 1 1 Center, press 4. For another property, press 5.",
-                TtsVoice = "en-US-JennyNeural",
-                Language = "en-US",
-                Category = "DataCollection",
-                Tags = new List<string> { "property", "building", "identify" },
-                IsActive = true,
-                CreatedAt = DateTime.UtcNow.AddDays(-10)
-            },
-            new()
-            {
-                Id = "prompt-inspection-type",
-                Name = "Inspection Type",
-                Description = "Asks caller what type of inspection they need",
-                Type = PromptType.Tts,
-                TtsText = "What type of inspection do you need? For an annual N F P A 72 inspection, press 1. For a semi-annual panel check, press 2. For a fire drill coordination, press 3. For a post-incident system evaluation, press 4.",
-                TtsVoice = "en-US-JennyNeural",
-                Language = "en-US",
-                Category = "DataCollection",
-                Tags = new List<string> { "inspection", "type", "nfpa" },
-                IsActive = true,
-                CreatedAt = DateTime.UtcNow.AddDays(-10)
-            },
-            new()
-            {
-                Id = "prompt-confirm-caller",
-                Name = "Confirm Caller Identity",
-                Description = "Asks caller to confirm or provide their name and role",
-                Type = PromptType.Tts,
-                TtsText = "Please confirm your role. If you are the building manager, press 1. If you are the fire safety officer, press 2. If you are a tenant or occupant, press 3. For all others, press 4.",
-                TtsVoice = "en-US-JennyNeural",
-                Language = "en-US",
-                Category = "DataCollection",
-                Tags = new List<string> { "caller", "identity", "role" },
-                IsActive = true,
-                CreatedAt = DateTime.UtcNow.AddDays(-10)
-            },
-            new()
-            {
-                Id = "prompt-transfer-scheduling",
-                Name = "Submission Confirmation — Scheduling",
-                Description = "Confirmation after submitting inspection data to external system",
-                Type = PromptType.Tts,
-                TtsText = "Thank you. Your inspection request has been submitted to our scheduling system with your property and inspection details. You will receive a confirmation call or email shortly. Goodbye.",
-                TtsVoice = "en-US-JennyNeural",
-                Language = "en-US",
-                Category = "Transfer",
-                Tags = new List<string> { "transfer", "scheduling", "confirm" },
-                IsActive = true,
-                CreatedAt = DateTime.UtcNow.AddDays(-10)
-            },
-            new()
-            {
-                Id = "prompt-identify-property-maint",
-                Name = "Identify Property (Maintenance)",
-                Description = "Asks caller to identify property for maintenance request",
-                Type = PromptType.Tts,
-                TtsText = "To help us dispatch the right technician, which property is this regarding? For Oakwood Office Park, press 1. For Sunrise Senior Living, press 2. For Hilltop Apartments, press 3. For County 9 1 1 Center, press 4. For another property, press 5.",
-                TtsVoice = "en-US-JennyNeural",
-                Language = "en-US",
-                Category = "DataCollection",
-                Tags = new List<string> { "property", "maintenance" },
-                IsActive = true,
-                CreatedAt = DateTime.UtcNow.AddDays(-10)
-            },
-            new()
-            {
-                Id = "prompt-malfunction-type",
-                Name = "Malfunction Type",
-                Description = "Asks what kind of alarm malfunction",
-                Type = PromptType.Tts,
-                TtsText = "What is the nature of the issue? For a false alarm or nuisance alarm, press 1. For a panel fault or trouble signal, press 2. For a detector or pull station issue, press 3. For a notification appliance issue such as strobes or horns, press 4.",
-                TtsVoice = "en-US-JennyNeural",
-                Language = "en-US",
-                Category = "DataCollection",
-                Tags = new List<string> { "malfunction", "type", "alarm" },
-                IsActive = true,
-                CreatedAt = DateTime.UtcNow.AddDays(-10)
-            },
-            new()
-            {
-                Id = "prompt-transfer-maintenance",
-                Name = "Submission Confirmation — Maintenance",
-                Description = "Confirmation after submitting maintenance data to external system",
-                Type = PromptType.Tts,
-                TtsText = "Thank you for the details. Your work order has been submitted to our maintenance system. A technician will be dispatched and you will receive a confirmation shortly. Goodbye.",
-                TtsVoice = "en-US-JennyNeural",
-                Language = "en-US",
-                Category = "Transfer",
-                Tags = new List<string> { "transfer", "maintenance", "workorder" },
-                IsActive = true,
-                CreatedAt = DateTime.UtcNow.AddDays(-10)
-            },
-            new()
-            {
-                Id = "prompt-account-lookup",
-                Name = "Account Lookup",
-                Description = "Asks for account number for billing",
-                Type = PromptType.Tts,
-                TtsText = "Which account is this regarding? For Oakwood Office Park, press 1. For Sunrise Senior Living, press 2. For Hilltop Apartments, press 3. For County 9 1 1 Center, press 4. For another account, press 5.",
-                TtsVoice = "en-US-JennyNeural",
-                Language = "en-US",
-                Category = "DataCollection",
-                Tags = new List<string> { "account", "billing", "lookup" },
-                IsActive = true,
-                CreatedAt = DateTime.UtcNow.AddDays(-10)
-            },
-            new()
-            {
-                Id = "prompt-transfer-billing",
-                Name = "Submission Confirmation — Billing",
-                Description = "Confirmation after submitting billing inquiry to external system",
-                Type = PromptType.Tts,
-                TtsText = "Got it. Your billing inquiry has been submitted to our account system for that property. You will receive a follow-up with your account details. Goodbye.",
-                TtsVoice = "en-US-JennyNeural",
-                Language = "en-US",
-                Category = "Transfer",
-                Tags = new List<string> { "transfer", "billing" },
                 IsActive = true,
                 CreatedAt = DateTime.UtcNow.AddDays(-10)
             }
@@ -365,11 +322,12 @@ public class SeededInMemoryCosmosDbService : ICosmosDbService
 
     private void SeedMenus()
     {
+        // ─── Main Menu ──────────────────────────────────────────
         var mainMenu = new IvrMenu
         {
             Id = "menu-main",
-            Name = "E911 Admin Main Menu",
-            Description = "Primary E911 administration line — fire alarm maintenance",
+            Name = "E911 Main Menu",
+            Description = "Primary E911 administration line",
             PromptId = "prompt-welcome",
             MenuType = MenuType.Root,
             IsRootMenu = true,
@@ -384,8 +342,8 @@ public class SeededInMemoryCosmosDbService : ICosmosDbService
                 new()
                 {
                     DtmfKey = "1",
-                    Label = "Emergency — Transfer to RDC",
-                    SpeechKeywords = new List<string> { "emergency", "fire", "dispatch", "urgent", "life safety", "rdc" },
+                    Label = "Emergency — Transfer to RDC Dispatcher",
+                    SpeechKeywords = new List<string> { "emergency", "dispatch", "urgent", "rdc" },
                     Action = new MenuAction
                     {
                         Type = ActionType.TransferToVdn,
@@ -396,46 +354,35 @@ public class SeededInMemoryCosmosDbService : ICosmosDbService
                 new()
                 {
                     DtmfKey = "2",
-                    Label = "Inspection Scheduling",
-                    SpeechKeywords = new List<string> { "inspection", "schedule", "annual", "test", "nfpa" },
-                    Action = new MenuAction { Type = ActionType.NavigateToMenu, TargetMenuId = "menu-inspection" }
+                    Label = "Alarm Administrator",
+                    SpeechKeywords = new List<string> { "alarm", "administrator", "lamas", "monitoring" },
+                    Action = new MenuAction { Type = ActionType.NavigateToMenu, TargetMenuId = "menu-alarm-admin" }
                 },
                 new()
                 {
                     DtmfKey = "3",
-                    Label = "Maintenance & Repair",
-                    SpeechKeywords = new List<string> { "maintenance", "repair", "malfunction", "broken", "trouble", "panel" },
-                    Action = new MenuAction { Type = ActionType.NavigateToMenu, TargetMenuId = "menu-maintenance" }
+                    Label = "Fire Dispatcher",
+                    SpeechKeywords = new List<string> { "fire", "fire dispatcher", "fed fire" },
+                    Action = new MenuAction { Type = ActionType.NavigateToMenu, TargetMenuId = "menu-fire-dispatch" }
                 },
                 new()
                 {
                     DtmfKey = "4",
-                    Label = "Account & Billing",
-                    SpeechKeywords = new List<string> { "billing", "account", "payment", "invoice", "report" },
-                    Action = new MenuAction { Type = ActionType.NavigateToMenu, TargetMenuId = "menu-billing" }
-                },
-                new()
-                {
-                    DtmfKey = "0",
-                    Label = "Operator",
-                    SpeechKeywords = new List<string> { "operator", "agent", "person", "representative" },
-                    Action = new MenuAction
-                    {
-                        Type = ActionType.TransferToVdn,
-                        VdnAddress = "sip:70300@sbc.yourdomain.com",
-                        PromptId = "prompt-hold"
-                    }
+                    Label = "Police Dispatcher",
+                    SpeechKeywords = new List<string> { "police", "police dispatcher", "joint base police" },
+                    Action = new MenuAction { Type = ActionType.NavigateToMenu, TargetMenuId = "menu-police-dispatch" }
                 }
             },
             CreatedAt = DateTime.UtcNow.AddDays(-30)
         };
 
-        var inspectionMenu = new IvrMenu
+        // ─── Option 2: Alarm Administrator → LAMAS Area ────────
+        var alarmAdminMenu = new IvrMenu
         {
-            Id = "menu-inspection",
-            Name = "Inspection Scheduling",
-            Description = "Fire alarm inspection scheduling — step 1: select service",
-            PromptId = "prompt-inspection",
+            Id = "menu-alarm-admin",
+            Name = "Alarm Administrator — LAMAS Area",
+            Description = "Select the affected LAMAS (Local Alarm Monitoring Automatic System) area",
+            PromptId = "prompt-lamas-area",
             MenuType = MenuType.SubMenu,
             ParentMenuId = "menu-main",
             IsActive = true,
@@ -446,296 +393,215 @@ public class SeededInMemoryCosmosDbService : ICosmosDbService
             Order = 1,
             Options = new List<MenuOption>
             {
-                new()
-                {
-                    DtmfKey = "1",
-                    Label = "Schedule New Inspection",
-                    Action = new MenuAction { Type = ActionType.NavigateToMenu, TargetMenuId = "menu-insp-property" }
-                },
-                new()
-                {
-                    DtmfKey = "2",
-                    Label = "Reschedule Existing",
-                    Action = new MenuAction { Type = ActionType.NavigateToMenu, TargetMenuId = "menu-insp-property" }
-                },
-                new()
-                {
-                    DtmfKey = "3",
-                    Label = "Confirm Upcoming Inspection",
-                    Action = new MenuAction { Type = ActionType.NavigateToMenu, TargetMenuId = "menu-insp-property" }
-                },
-                new()
-                {
-                    DtmfKey = "9",
-                    Label = "Main Menu",
-                    Action = new MenuAction { Type = ActionType.NavigateToMenu, TargetMenuId = "menu-main" }
-                }
+                new() { DtmfKey = "1", Label = "Joint Base Pearl Harbor",
+                    SpeechKeywords = new List<string> { "pearl harbor", "joint base" },
+                    Action = new MenuAction { Type = ActionType.NavigateToMenu, TargetMenuId = "menu-alarm-select" } },
+                new() { DtmfKey = "2", Label = "Hickam",
+                    SpeechKeywords = new List<string> { "hickam" },
+                    Action = new MenuAction { Type = ActionType.NavigateToMenu, TargetMenuId = "menu-alarm-select" } },
+                new() { DtmfKey = "3", Label = "West Loch",
+                    SpeechKeywords = new List<string> { "west loch" },
+                    Action = new MenuAction { Type = ActionType.NavigateToMenu, TargetMenuId = "menu-alarm-select" } },
+                new() { DtmfKey = "4", Label = "NCTAMS",
+                    SpeechKeywords = new List<string> { "nctams" },
+                    Action = new MenuAction { Type = ActionType.NavigateToMenu, TargetMenuId = "menu-alarm-select" } },
+                new() { DtmfKey = "5", Label = "PMRF",
+                    SpeechKeywords = new List<string> { "pmrf" },
+                    Action = new MenuAction { Type = ActionType.NavigateToMenu, TargetMenuId = "menu-alarm-select" } }
             },
             CreatedAt = DateTime.UtcNow.AddDays(-28)
         };
 
-        // ─── Inspection: Step 2 — Which property? ───
-        var inspPropertyMenu = new IvrMenu
+        // ─── Option 2b: Select Alarm ─────────────────────────────
+        var alarmSelectMenu = new IvrMenu
         {
-            Id = "menu-insp-property",
-            Name = "Inspection — Property Selection",
-            Description = "Select which property the inspection is for",
-            PromptId = "prompt-identify-property",
+            Id = "menu-alarm-select",
+            Name = "Alarm Administrator — Select Alarm",
+            Description = "Select which alarm this is regarding",
+            PromptId = "prompt-alarm-select",
             MenuType = MenuType.SubMenu,
-            ParentMenuId = "menu-inspection",
+            ParentMenuId = "menu-alarm-admin",
             IsActive = true,
-            TimeoutSeconds = 15,
+            TimeoutSeconds = 10,
             MaxRetries = 3,
             TimeoutPromptId = "prompt-timeout",
             InvalidInputPromptId = "prompt-invalid",
             Order = 1,
             Options = new List<MenuOption>
             {
-                new() { DtmfKey = "1", Label = "Oakwood Office Park",
-                    Action = new MenuAction { Type = ActionType.NavigateToMenu, TargetMenuId = "menu-insp-type" } },
-                new() { DtmfKey = "2", Label = "Sunrise Senior Living",
-                    Action = new MenuAction { Type = ActionType.NavigateToMenu, TargetMenuId = "menu-insp-type" } },
-                new() { DtmfKey = "3", Label = "Hilltop Apartments",
-                    Action = new MenuAction { Type = ActionType.NavigateToMenu, TargetMenuId = "menu-insp-type" } },
-                new() { DtmfKey = "4", Label = "County 911 Center",
-                    Action = new MenuAction { Type = ActionType.NavigateToMenu, TargetMenuId = "menu-insp-type" } },
-                new() { DtmfKey = "5", Label = "Other Property",
-                    Action = new MenuAction { Type = ActionType.NavigateToMenu, TargetMenuId = "menu-insp-type" } }
+                new() { DtmfKey = "1", Label = "Fire Alarm",
+                    SpeechKeywords = new List<string> { "fire alarm", "fire" },
+                    Action = new MenuAction { Type = ActionType.NavigateToMenu, TargetMenuId = "menu-alarm-status" } },
+                new() { DtmfKey = "2", Label = "Intrusion Alarm",
+                    SpeechKeywords = new List<string> { "intrusion", "break in", "security alarm" },
+                    Action = new MenuAction { Type = ActionType.NavigateToMenu, TargetMenuId = "menu-alarm-status" } },
+                new() { DtmfKey = "3", Label = "Duress Alarm",
+                    SpeechKeywords = new List<string> { "duress", "panic" },
+                    Action = new MenuAction { Type = ActionType.NavigateToMenu, TargetMenuId = "menu-alarm-status" } },
+                new() { DtmfKey = "4", Label = "Supervisory Alarm",
+                    SpeechKeywords = new List<string> { "supervisory", "tamper", "trouble" },
+                    Action = new MenuAction { Type = ActionType.NavigateToMenu, TargetMenuId = "menu-alarm-status" } },
+                new() { DtmfKey = "5", Label = "Environmental Alarm",
+                    SpeechKeywords = new List<string> { "environmental", "flood", "temperature", "gas" },
+                    Action = new MenuAction { Type = ActionType.NavigateToMenu, TargetMenuId = "menu-alarm-status" } }
             },
-            CreatedAt = DateTime.UtcNow.AddDays(-10)
+            CreatedAt = DateTime.UtcNow.AddDays(-28)
         };
 
-        // ─── Inspection: Step 3 — What type of inspection? ───
-        var inspTypeMenu = new IvrMenu
+        // ─── Option 2c: Alarm Status (Inspection / Test / Maintenance) ──
+        var alarmStatusMenu = new IvrMenu
         {
-            Id = "menu-insp-type",
-            Name = "Inspection — Type Selection",
-            Description = "Select the type of inspection needed",
-            PromptId = "prompt-inspection-type",
+            Id = "menu-alarm-status",
+            Name = "Alarm Administrator — Alarm Status",
+            Description = "Will the alarms be in inspection, test, or maintenance?",
+            PromptId = "prompt-alarm-status",
             MenuType = MenuType.SubMenu,
-            ParentMenuId = "menu-insp-property",
+            ParentMenuId = "menu-alarm-select",
             IsActive = true,
-            TimeoutSeconds = 15,
+            TimeoutSeconds = 10,
             MaxRetries = 3,
             TimeoutPromptId = "prompt-timeout",
             InvalidInputPromptId = "prompt-invalid",
             Order = 2,
             Options = new List<MenuOption>
             {
-                new() { DtmfKey = "1", Label = "Annual NFPA 72 Inspection",
-                    Action = new MenuAction { Type = ActionType.NavigateToMenu, TargetMenuId = "menu-insp-caller" } },
-                new() { DtmfKey = "2", Label = "Semi-Annual Panel Check",
-                    Action = new MenuAction { Type = ActionType.NavigateToMenu, TargetMenuId = "menu-insp-caller" } },
-                new() { DtmfKey = "3", Label = "Fire Drill Coordination",
-                    Action = new MenuAction { Type = ActionType.NavigateToMenu, TargetMenuId = "menu-insp-caller" } },
-                new() { DtmfKey = "4", Label = "Post-Incident Evaluation",
-                    Action = new MenuAction { Type = ActionType.NavigateToMenu, TargetMenuId = "menu-insp-caller" } }
+                new() { DtmfKey = "1", Label = "Inspection",
+                    SpeechKeywords = new List<string> { "inspection", "inspect" },
+                    Action = new MenuAction { Type = ActionType.Webhook, WebhookUrl = "http://pstn-simulator:8080/api/external/work-order", PromptId = "prompt-alarm-submitted" } },
+                new() { DtmfKey = "2", Label = "Test",
+                    SpeechKeywords = new List<string> { "test", "testing" },
+                    Action = new MenuAction { Type = ActionType.Webhook, WebhookUrl = "http://pstn-simulator:8080/api/external/work-order", PromptId = "prompt-alarm-submitted" } },
+                new() { DtmfKey = "3", Label = "Maintenance",
+                    SpeechKeywords = new List<string> { "maintenance", "repair", "service" },
+                    Action = new MenuAction { Type = ActionType.Webhook, WebhookUrl = "http://pstn-simulator:8080/api/external/work-order", PromptId = "prompt-alarm-submitted" } }
             },
-            CreatedAt = DateTime.UtcNow.AddDays(-10)
+            CreatedAt = DateTime.UtcNow.AddDays(-28)
         };
 
-        // ─── Inspection: Step 4 — Who is calling? ───
-        var inspCallerMenu = new IvrMenu
+        // ─── Option 3: Fire Dispatcher → Department ─────────────
+        var fireDispatchMenu = new IvrMenu
         {
-            Id = "menu-insp-caller",
-            Name = "Inspection — Caller Role",
-            Description = "Confirm the caller's role at the property",
-            PromptId = "prompt-confirm-caller",
+            Id = "menu-fire-dispatch",
+            Name = "Fire Dispatcher — Department",
+            Description = "Select which fire department",
+            PromptId = "prompt-fire-department",
             MenuType = MenuType.SubMenu,
-            ParentMenuId = "menu-insp-type",
+            ParentMenuId = "menu-main",
             IsActive = true,
-            TimeoutSeconds = 15,
+            TimeoutSeconds = 10,
+            MaxRetries = 3,
+            TimeoutPromptId = "prompt-timeout",
+            InvalidInputPromptId = "prompt-invalid",
+            Order = 2,
+            Options = new List<MenuOption>
+            {
+                new() { DtmfKey = "1", Label = "Fed Fire",
+                    SpeechKeywords = new List<string> { "fed fire", "federal fire" },
+                    Action = new MenuAction { Type = ActionType.NavigateToMenu, TargetMenuId = "menu-fire-reason" } },
+                new() { DtmfKey = "2", Label = "PMRF",
+                    SpeechKeywords = new List<string> { "pmrf" },
+                    Action = new MenuAction { Type = ActionType.NavigateToMenu, TargetMenuId = "menu-fire-reason" } }
+            },
+            CreatedAt = DateTime.UtcNow.AddDays(-28)
+        };
+
+        // ─── Option 3b: Fire Dispatch → Reason for Call ──────
+        var fireReasonMenu = new IvrMenu
+        {
+            Id = "menu-fire-reason",
+            Name = "Fire Dispatch — Reason for Call",
+            Description = "Non-emergency reason for contacting fire dispatch",
+            PromptId = "prompt-fire-reason",
+            MenuType = MenuType.SubMenu,
+            ParentMenuId = "menu-fire-dispatch",
+            IsActive = true,
+            TimeoutSeconds = 10,
+            MaxRetries = 3,
+            TimeoutPromptId = "prompt-timeout",
+            InvalidInputPromptId = "prompt-invalid",
+            Order = 1,
+            Options = new List<MenuOption>
+            {
+                new() { DtmfKey = "1", Label = "Burn Permit Request",
+                    SpeechKeywords = new List<string> { "burn permit", "permit", "burning" },
+                    Action = new MenuAction { Type = ActionType.TransferToVdn, VdnAddress = "sip:70220@sbc.yourdomain.com", PromptId = "prompt-transfer-fire" } },
+                new() { DtmfKey = "2", Label = "Fire Prevention / Inspection",
+                    SpeechKeywords = new List<string> { "prevention", "inspection", "fire inspection" },
+                    Action = new MenuAction { Type = ActionType.TransferToVdn, VdnAddress = "sip:70220@sbc.yourdomain.com", PromptId = "prompt-transfer-fire" } },
+                new() { DtmfKey = "3", Label = "Community Outreach / Education",
+                    SpeechKeywords = new List<string> { "outreach", "education", "community", "school", "tour" },
+                    Action = new MenuAction { Type = ActionType.TransferToVdn, VdnAddress = "sip:70220@sbc.yourdomain.com", PromptId = "prompt-transfer-fire" } },
+                new() { DtmfKey = "4", Label = "Incident Report Request",
+                    SpeechKeywords = new List<string> { "report", "incident report", "records" },
+                    Action = new MenuAction { Type = ActionType.TransferToVdn, VdnAddress = "sip:70220@sbc.yourdomain.com", PromptId = "prompt-transfer-fire" } },
+                new() { DtmfKey = "5", Label = "General Inquiry",
+                    SpeechKeywords = new List<string> { "general", "question", "other", "inquiry" },
+                    Action = new MenuAction { Type = ActionType.TransferToVdn, VdnAddress = "sip:70220@sbc.yourdomain.com", PromptId = "prompt-transfer-fire" } }
+            },
+            CreatedAt = DateTime.UtcNow.AddDays(-28)
+        };
+
+        // ─── Option 4: Police Dispatcher → Department ───────────
+        var policeDispatchMenu = new IvrMenu
+        {
+            Id = "menu-police-dispatch",
+            Name = "Police Dispatcher — Department",
+            Description = "Select which police department",
+            PromptId = "prompt-police-department",
+            MenuType = MenuType.SubMenu,
+            ParentMenuId = "menu-main",
+            IsActive = true,
+            TimeoutSeconds = 10,
             MaxRetries = 3,
             TimeoutPromptId = "prompt-timeout",
             InvalidInputPromptId = "prompt-invalid",
             Order = 3,
             Options = new List<MenuOption>
             {
-                new() { DtmfKey = "1", Label = "Building Manager",
-                    Action = new MenuAction { Type = ActionType.Webhook, WebhookUrl = "http://pstn-simulator:8080/api/external/work-order", PromptId = "prompt-transfer-scheduling" } },
-                new() { DtmfKey = "2", Label = "Fire Safety Officer",
-                    Action = new MenuAction { Type = ActionType.Webhook, WebhookUrl = "http://pstn-simulator:8080/api/external/work-order", PromptId = "prompt-transfer-scheduling" } },
-                new() { DtmfKey = "3", Label = "Tenant / Occupant",
-                    Action = new MenuAction { Type = ActionType.Webhook, WebhookUrl = "http://pstn-simulator:8080/api/external/work-order", PromptId = "prompt-transfer-scheduling" } },
-                new() { DtmfKey = "4", Label = "Other",
-                    Action = new MenuAction { Type = ActionType.Webhook, WebhookUrl = "http://pstn-simulator:8080/api/external/work-order", PromptId = "prompt-transfer-scheduling" } }
-            },
-            CreatedAt = DateTime.UtcNow.AddDays(-10)
-        };
-
-        var maintenanceMenu = new IvrMenu
-        {
-            Id = "menu-maintenance",
-            Name = "Maintenance & Repair",
-            Description = "Fire alarm maintenance — step 1: select service",
-            PromptId = "prompt-maintenance",
-            MenuType = MenuType.SubMenu,
-            ParentMenuId = "menu-main",
-            IsActive = true,
-            TimeoutSeconds = 10,
-            MaxRetries = 3,
-            Order = 2,
-            Options = new List<MenuOption>
-            {
-                new()
-                {
-                    DtmfKey = "1",
-                    Label = "Report Alarm Malfunction",
-                    Action = new MenuAction { Type = ActionType.NavigateToMenu, TargetMenuId = "menu-maint-property" }
-                },
-                new()
-                {
-                    DtmfKey = "2",
-                    Label = "Check Work Order Status",
-                    Action = new MenuAction { Type = ActionType.NavigateToMenu, TargetMenuId = "menu-maint-property" }
-                },
-                new()
-                {
-                    DtmfKey = "3",
-                    Label = "Panel Replacement / Upgrade",
-                    Action = new MenuAction { Type = ActionType.NavigateToMenu, TargetMenuId = "menu-maint-property" }
-                },
-                new()
-                {
-                    DtmfKey = "9",
-                    Label = "Main Menu",
-                    Action = new MenuAction { Type = ActionType.NavigateToMenu, TargetMenuId = "menu-main" }
-                }
+                new() { DtmfKey = "1", Label = "Joint Base Police",
+                    SpeechKeywords = new List<string> { "joint base police", "joint base" },
+                    Action = new MenuAction { Type = ActionType.NavigateToMenu, TargetMenuId = "menu-police-reason" } },
+                new() { DtmfKey = "2", Label = "PMRF",
+                    SpeechKeywords = new List<string> { "pmrf" },
+                    Action = new MenuAction { Type = ActionType.NavigateToMenu, TargetMenuId = "menu-police-reason" } }
             },
             CreatedAt = DateTime.UtcNow.AddDays(-28)
         };
 
-        // ─── Maintenance: Step 2 — Which property? ───
-        var maintPropertyMenu = new IvrMenu
+        // ─── Option 4b: Police Dispatch → Reason for Call ──────
+        var policeReasonMenu = new IvrMenu
         {
-            Id = "menu-maint-property",
-            Name = "Maintenance — Property Selection",
-            Description = "Select which property has the maintenance issue",
-            PromptId = "prompt-identify-property-maint",
+            Id = "menu-police-reason",
+            Name = "Police Dispatch — Reason for Call",
+            Description = "Non-emergency reason for contacting police dispatch",
+            PromptId = "prompt-police-reason",
             MenuType = MenuType.SubMenu,
-            ParentMenuId = "menu-maintenance",
-            IsActive = true,
-            TimeoutSeconds = 15,
-            MaxRetries = 3,
-            TimeoutPromptId = "prompt-timeout",
-            InvalidInputPromptId = "prompt-invalid",
-            Order = 1,
-            Options = new List<MenuOption>
-            {
-                new() { DtmfKey = "1", Label = "Oakwood Office Park",
-                    Action = new MenuAction { Type = ActionType.NavigateToMenu, TargetMenuId = "menu-maint-issue" } },
-                new() { DtmfKey = "2", Label = "Sunrise Senior Living",
-                    Action = new MenuAction { Type = ActionType.NavigateToMenu, TargetMenuId = "menu-maint-issue" } },
-                new() { DtmfKey = "3", Label = "Hilltop Apartments",
-                    Action = new MenuAction { Type = ActionType.NavigateToMenu, TargetMenuId = "menu-maint-issue" } },
-                new() { DtmfKey = "4", Label = "County 911 Center",
-                    Action = new MenuAction { Type = ActionType.NavigateToMenu, TargetMenuId = "menu-maint-issue" } },
-                new() { DtmfKey = "5", Label = "Other Property",
-                    Action = new MenuAction { Type = ActionType.NavigateToMenu, TargetMenuId = "menu-maint-issue" } }
-            },
-            CreatedAt = DateTime.UtcNow.AddDays(-10)
-        };
-
-        // ─── Maintenance: Step 3 — What's the issue? ───
-        var maintIssueMenu = new IvrMenu
-        {
-            Id = "menu-maint-issue",
-            Name = "Maintenance — Issue Type",
-            Description = "Select the type of maintenance issue",
-            PromptId = "prompt-malfunction-type",
-            MenuType = MenuType.SubMenu,
-            ParentMenuId = "menu-maint-property",
-            IsActive = true,
-            TimeoutSeconds = 15,
-            MaxRetries = 3,
-            TimeoutPromptId = "prompt-timeout",
-            InvalidInputPromptId = "prompt-invalid",
-            Order = 2,
-            Options = new List<MenuOption>
-            {
-                new() { DtmfKey = "1", Label = "False / Nuisance Alarm",
-                    Action = new MenuAction { Type = ActionType.Webhook, WebhookUrl = "http://pstn-simulator:8080/api/external/work-order", PromptId = "prompt-transfer-maintenance" } },
-                new() { DtmfKey = "2", Label = "Panel Fault / Trouble Signal",
-                    Action = new MenuAction { Type = ActionType.Webhook, WebhookUrl = "http://pstn-simulator:8080/api/external/work-order", PromptId = "prompt-transfer-maintenance" } },
-                new() { DtmfKey = "3", Label = "Detector / Pull Station Issue",
-                    Action = new MenuAction { Type = ActionType.Webhook, WebhookUrl = "http://pstn-simulator:8080/api/external/work-order", PromptId = "prompt-transfer-maintenance" } },
-                new() { DtmfKey = "4", Label = "Notification Appliance (Strobes/Horns)",
-                    Action = new MenuAction { Type = ActionType.Webhook, WebhookUrl = "http://pstn-simulator:8080/api/external/work-order", PromptId = "prompt-transfer-maintenance" } }
-            },
-            CreatedAt = DateTime.UtcNow.AddDays(-10)
-        };
-
-        var billingMenu = new IvrMenu
-        {
-            Id = "menu-billing",
-            Name = "Account & Billing",
-            Description = "Billing — step 1: select service",
-            PromptId = "prompt-billing",
-            MenuType = MenuType.SubMenu,
-            ParentMenuId = "menu-main",
+            ParentMenuId = "menu-police-dispatch",
             IsActive = true,
             TimeoutSeconds = 10,
             MaxRetries = 3,
-            Order = 3,
-            Options = new List<MenuOption>
-            {
-                new()
-                {
-                    DtmfKey = "1",
-                    Label = "Check Balance",
-                    Action = new MenuAction { Type = ActionType.NavigateToMenu, TargetMenuId = "menu-bill-account" }
-                },
-                new()
-                {
-                    DtmfKey = "2",
-                    Label = "Make a Payment",
-                    Action = new MenuAction { Type = ActionType.NavigateToMenu, TargetMenuId = "menu-bill-account" }
-                },
-                new()
-                {
-                    DtmfKey = "3",
-                    Label = "Request Inspection Report",
-                    Action = new MenuAction { Type = ActionType.NavigateToMenu, TargetMenuId = "menu-bill-account" }
-                },
-                new()
-                {
-                    DtmfKey = "9",
-                    Label = "Main Menu",
-                    Action = new MenuAction { Type = ActionType.NavigateToMenu, TargetMenuId = "menu-main" }
-                }
-            },
-            CreatedAt = DateTime.UtcNow.AddDays(-25)
-        };
-
-        // ─── Billing: Step 2 — Which account? ───
-        var billAccountMenu = new IvrMenu
-        {
-            Id = "menu-bill-account",
-            Name = "Billing — Account Selection",
-            Description = "Select which account this billing inquiry is for",
-            PromptId = "prompt-account-lookup",
-            MenuType = MenuType.SubMenu,
-            ParentMenuId = "menu-billing",
-            IsActive = true,
-            TimeoutSeconds = 15,
-            MaxRetries = 3,
             TimeoutPromptId = "prompt-timeout",
             InvalidInputPromptId = "prompt-invalid",
             Order = 1,
             Options = new List<MenuOption>
             {
-                new() { DtmfKey = "1", Label = "Oakwood Office Park",
-                    Action = new MenuAction { Type = ActionType.Webhook, WebhookUrl = "http://pstn-simulator:8080/api/external/work-order", PromptId = "prompt-transfer-billing" } },
-                new() { DtmfKey = "2", Label = "Sunrise Senior Living",
-                    Action = new MenuAction { Type = ActionType.Webhook, WebhookUrl = "http://pstn-simulator:8080/api/external/work-order", PromptId = "prompt-transfer-billing" } },
-                new() { DtmfKey = "3", Label = "Hilltop Apartments",
-                    Action = new MenuAction { Type = ActionType.Webhook, WebhookUrl = "http://pstn-simulator:8080/api/external/work-order", PromptId = "prompt-transfer-billing" } },
-                new() { DtmfKey = "4", Label = "County 911 Center",
-                    Action = new MenuAction { Type = ActionType.Webhook, WebhookUrl = "http://pstn-simulator:8080/api/external/work-order", PromptId = "prompt-transfer-billing" } },
-                new() { DtmfKey = "5", Label = "Other Account",
-                    Action = new MenuAction { Type = ActionType.Webhook, WebhookUrl = "http://pstn-simulator:8080/api/external/work-order", PromptId = "prompt-transfer-billing" } }
+                new() { DtmfKey = "1", Label = "File a Report",
+                    SpeechKeywords = new List<string> { "report", "file a report", "incident" },
+                    Action = new MenuAction { Type = ActionType.TransferToVdn, VdnAddress = "sip:70230@sbc.yourdomain.com", PromptId = "prompt-transfer-police" } },
+                new() { DtmfKey = "2", Label = "Traffic / Parking Concern",
+                    SpeechKeywords = new List<string> { "traffic", "parking", "speeding", "vehicle" },
+                    Action = new MenuAction { Type = ActionType.TransferToVdn, VdnAddress = "sip:70230@sbc.yourdomain.com", PromptId = "prompt-transfer-police" } },
+                new() { DtmfKey = "3", Label = "Lost / Found Property",
+                    SpeechKeywords = new List<string> { "lost", "found", "property", "missing item" },
+                    Action = new MenuAction { Type = ActionType.TransferToVdn, VdnAddress = "sip:70230@sbc.yourdomain.com", PromptId = "prompt-transfer-police" } },
+                new() { DtmfKey = "4", Label = "Noise Complaint",
+                    SpeechKeywords = new List<string> { "noise", "complaint", "disturbance" },
+                    Action = new MenuAction { Type = ActionType.TransferToVdn, VdnAddress = "sip:70230@sbc.yourdomain.com", PromptId = "prompt-transfer-police" } },
+                new() { DtmfKey = "5", Label = "General Inquiry",
+                    SpeechKeywords = new List<string> { "general", "question", "other", "inquiry" },
+                    Action = new MenuAction { Type = ActionType.TransferToVdn, VdnAddress = "sip:70230@sbc.yourdomain.com", PromptId = "prompt-transfer-police" } }
             },
-            CreatedAt = DateTime.UtcNow.AddDays(-10)
+            CreatedAt = DateTime.UtcNow.AddDays(-28)
         };
 
         var afterHoursMenu = new IvrMenu
@@ -782,7 +648,7 @@ public class SeededInMemoryCosmosDbService : ICosmosDbService
             IsActive = true,
             EnableSpeechRecognition = true,
             SpeechRoutingPromptId = "prompt-speech",
-            TeamRoutingConfigIds = new List<string> { "team-rdc", "team-inspection", "team-maintenance", "team-billing" },
+            TeamRoutingConfigIds = new List<string> { "team-rdc", "team-alarm-admin", "team-fire-dispatch", "team-police-dispatch" },
             SpeechFallbackAction = new MenuAction
             {
                 Type = ActionType.TransferToVdn,
@@ -794,9 +660,9 @@ public class SeededInMemoryCosmosDbService : ICosmosDbService
 
         foreach (var m in new IvrMenu[]
         {
-            mainMenu, inspectionMenu, inspPropertyMenu, inspTypeMenu, inspCallerMenu,
-            maintenanceMenu, maintPropertyMenu, maintIssueMenu,
-            billingMenu, billAccountMenu,
+            mainMenu, alarmAdminMenu, alarmSelectMenu, alarmStatusMenu,
+            fireDispatchMenu, fireReasonMenu,
+            policeDispatchMenu, policeReasonMenu,
             afterHoursMenu, speechMenu
         })
             _menus[m.Id] = m;
@@ -809,20 +675,21 @@ public class SeededInMemoryCosmosDbService : ICosmosDbService
             new()
             {
                 Id = "ani-1",
-                PhoneNumber = "+15551234567",
-                CallerName = "Oakwood Office Park — Bldg Mgmt",
-                AccountNumber = "FA-10042",
-                CallerType = CallerType.Business,
+                PhoneNumber = "+18085551234",
+                CallerName = "JBPHH — Bldg 1 (HQ Pacific Fleet)",
+                AccountNumber = "NAV-10042",
+                CallerType = CallerType.Government,
                 Language = "en-US",
-                IsVip = false,
+                IsVip = true,
+                Priority = 25,
                 CreatedAt = DateTime.UtcNow.AddDays(-60)
             },
             new()
             {
                 Id = "ani-2",
-                PhoneNumber = "+15559876543",
-                CallerName = "City of Springfield — Fire Marshal",
-                AccountNumber = "GOV-20015",
+                PhoneNumber = "+18085559876",
+                CallerName = "Hickam — Bldg 1100 (15th Wing HQ)",
+                AccountNumber = "NAV-20015",
                 CallerType = CallerType.Government,
                 Language = "en-US",
                 IsVip = true,
@@ -832,7 +699,7 @@ public class SeededInMemoryCosmosDbService : ICosmosDbService
             new()
             {
                 Id = "ani-3",
-                PhoneNumber = "+15550001111",
+                PhoneNumber = "+18085550001",
                 CallerName = "Spam / Telemarketer",
                 CallerType = CallerType.Unknown,
                 Language = "en-US",
@@ -842,21 +709,20 @@ public class SeededInMemoryCosmosDbService : ICosmosDbService
             new()
             {
                 Id = "ani-4",
-                PhoneNumber = "+15552223333",
-                CallerName = "Sunrise Senior Living — Facilities",
-                AccountNumber = "FA-30078",
-                CallerType = CallerType.Business,
+                PhoneNumber = "+18085552223",
+                CallerName = "West Loch — Magazine Area Operations",
+                AccountNumber = "NAV-30078",
+                CallerType = CallerType.Government,
                 Language = "en-US",
-                IsVip = true,
-                Priority = 15,
+                IsVip = false,
                 CreatedAt = DateTime.UtcNow.AddDays(-30)
             },
             new()
             {
                 Id = "ani-5",
-                PhoneNumber = "+15554445555",
-                CallerName = "County 911 Center — Admin",
-                AccountNumber = "GOV-5001",
+                PhoneNumber = "+18085554445",
+                CallerName = "NCTAMS PAC — Wahiawa Comm Station",
+                AccountNumber = "NAV-5001",
                 CallerType = CallerType.Government,
                 Language = "en-US",
                 IsVip = true,
@@ -866,20 +732,21 @@ public class SeededInMemoryCosmosDbService : ICosmosDbService
             new()
             {
                 Id = "ani-6",
-                PhoneNumber = "+15556667777",
-                CallerName = "Hilltop Apartments — Super",
-                AccountNumber = "FA-40022",
-                CallerType = CallerType.Residential,
+                PhoneNumber = "+18085556667",
+                CallerName = "PMRF — Barking Sands (Bldg 110)",
+                AccountNumber = "NAV-40022",
+                CallerType = CallerType.Government,
                 Language = "en-US",
+                IsVip = false,
                 CreatedAt = DateTime.UtcNow.AddDays(-15)
             },
             new()
             {
                 Id = "ani-7",
-                PhoneNumber = "+15558889999",
-                CallerName = "Regional Hospital — Safety Dept",
-                AccountNumber = "FA-50033",
-                CallerType = CallerType.Business,
+                PhoneNumber = "+18085558889",
+                CallerName = "Tripler Army Medical Center",
+                AccountNumber = "NAV-50033",
+                CallerType = CallerType.Government,
                 Language = "en-US",
                 IsVip = true,
                 Priority = 20,
@@ -888,10 +755,10 @@ public class SeededInMemoryCosmosDbService : ICosmosDbService
             new()
             {
                 Id = "ani-8",
-                PhoneNumber = "+15553334444",
-                CallerName = "Lincoln Elementary School",
-                AccountNumber = "FA-60011",
-                CallerType = CallerType.Business,
+                PhoneNumber = "+18085553334",
+                CallerName = "JBPHH — Makalapa Housing",
+                AccountNumber = "NAV-60011",
+                CallerType = CallerType.Government,
                 Language = "en-US",
                 IsVip = false,
                 CreatedAt = DateTime.UtcNow.AddDays(-50)
@@ -899,7 +766,7 @@ public class SeededInMemoryCosmosDbService : ICosmosDbService
             new()
             {
                 Id = "ani-9",
-                PhoneNumber = "+15557778888",
+                PhoneNumber = "+18085557778",
                 CallerName = "RDC — Remote Dispatch Center",
                 AccountNumber = "RDC-001",
                 CallerType = CallerType.Government,
@@ -921,79 +788,79 @@ public class SeededInMemoryCosmosDbService : ICosmosDbService
             new()
             {
                 Id = "ali-1",
-                PhoneNumber = "+15551234567",
-                Address = new Address { Street = "200 Oakwood Blvd, Suite 100", City = "Springfield", State = "IL", ZipCode = "62701" },
-                Coordinates = new GeoCoordinates { Latitude = 39.7817, Longitude = -89.6501 },
+                PhoneNumber = "+18085551234",
+                Address = new Address { Street = "Bldg 1, Pacific Fleet HQ", City = "Joint Base Pearl Harbor-Hickam", State = "HI", ZipCode = "96860" },
+                Coordinates = new GeoCoordinates { Latitude = 21.3547, Longitude = -157.9500 },
                 LocationType = LocationType.Commercial,
-                ServiceArea = "Central Illinois",
-                Region = "Midwest",
-                Timezone = "America/Chicago"
+                ServiceArea = "JBPHH",
+                Region = "Hawaii",
+                Timezone = "Pacific/Honolulu"
             },
             new()
             {
                 Id = "ali-2",
-                PhoneNumber = "+15559876543",
-                Address = new Address { Street = "1 Government Plaza", City = "Springfield", State = "IL", ZipCode = "62702" },
-                Coordinates = new GeoCoordinates { Latitude = 39.7990, Longitude = -89.6440 },
+                PhoneNumber = "+18085559876",
+                Address = new Address { Street = "Bldg 1100, 15th Wing HQ", City = "Hickam Field", State = "HI", ZipCode = "96853" },
+                Coordinates = new GeoCoordinates { Latitude = 21.3187, Longitude = -157.9246 },
                 LocationType = LocationType.Commercial,
-                ServiceArea = "Central Illinois",
-                Region = "Midwest",
-                Timezone = "America/Chicago"
+                ServiceArea = "Hickam",
+                Region = "Hawaii",
+                Timezone = "Pacific/Honolulu"
             },
             new()
             {
                 Id = "ali-3",
-                PhoneNumber = "+15552223333",
-                Address = new Address { Street = "450 Sunrise Drive", City = "Decatur", State = "IL", ZipCode = "62521" },
-                Coordinates = new GeoCoordinates { Latitude = 39.8403, Longitude = -88.9548 },
+                PhoneNumber = "+18085552223",
+                Address = new Address { Street = "West Loch Annex, Magazine Rd", City = "Ewa Beach", State = "HI", ZipCode = "96706" },
+                Coordinates = new GeoCoordinates { Latitude = 21.3400, Longitude = -157.9800 },
                 LocationType = LocationType.Commercial,
-                ServiceArea = "Central Illinois",
-                Region = "Midwest",
-                Timezone = "America/Chicago"
+                ServiceArea = "West Loch",
+                Region = "Hawaii",
+                Timezone = "Pacific/Honolulu"
             },
             new()
             {
                 Id = "ali-4",
-                PhoneNumber = "+15554445555",
-                Address = new Address { Street = "800 County Center Dr", City = "Champaign", State = "IL", ZipCode = "61820" },
-                Coordinates = new GeoCoordinates { Latitude = 40.1164, Longitude = -88.2434 },
+                PhoneNumber = "+18085554445",
+                Address = new Address { Street = "NCTAMS PAC, Wahiawa Station", City = "Wahiawa", State = "HI", ZipCode = "96786" },
+                Coordinates = new GeoCoordinates { Latitude = 21.5000, Longitude = -158.0236 },
                 LocationType = LocationType.Commercial,
-                ServiceArea = "East Central Illinois",
-                Region = "Midwest",
-                Timezone = "America/Chicago"
+                ServiceArea = "NCTAMS",
+                Region = "Hawaii",
+                Timezone = "Pacific/Honolulu"
             },
             new()
             {
                 Id = "ali-5",
-                PhoneNumber = "+15556667777",
-                Address = new Address { Street = "1200 Hilltop Lane", City = "Bloomington", State = "IL", ZipCode = "61701" },
-                Coordinates = new GeoCoordinates { Latitude = 40.4842, Longitude = -88.9937 },
-                LocationType = LocationType.Residential,
-                ServiceArea = "Central Illinois",
-                Region = "Midwest",
-                Timezone = "America/Chicago"
+                PhoneNumber = "+18085556667",
+                Address = new Address { Street = "Bldg 110, Barking Sands", City = "Kekaha", State = "HI", ZipCode = "96752" },
+                Coordinates = new GeoCoordinates { Latitude = 22.0226, Longitude = -159.7850 },
+                LocationType = LocationType.Commercial,
+                ServiceArea = "PMRF",
+                Region = "Hawaii",
+                Timezone = "Pacific/Honolulu"
             },
             new()
             {
                 Id = "ali-6",
-                PhoneNumber = "+15558889999",
-                Address = new Address { Street = "500 Medical Center Pkwy", City = "Peoria", State = "IL", ZipCode = "61602" },
-                Coordinates = new GeoCoordinates { Latitude = 40.6936, Longitude = -89.5890 },
+                PhoneNumber = "+18085558889",
+                Address = new Address { Street = "1 Jarrett White Rd", City = "Tripler AMC", State = "HI", ZipCode = "96859" },
+                Coordinates = new GeoCoordinates { Latitude = 21.3625, Longitude = -157.8861 },
                 LocationType = LocationType.Commercial,
-                ServiceArea = "Central Illinois",
-                Region = "Midwest",
-                Timezone = "America/Chicago"
+                ServiceArea = "JBPHH",
+                Region = "Hawaii",
+                Timezone = "Pacific/Honolulu"
             },
             new()
             {
                 Id = "ali-7",
-                PhoneNumber = "+15553334444",
-                Address = new Address { Street = "300 Lincoln Ave", City = "Springfield", State = "IL", ZipCode = "62704" },
-                Coordinates = new GeoCoordinates { Latitude = 39.7717, Longitude = -89.6601 },
-                LocationType = LocationType.Commercial,
-                ServiceArea = "Central Illinois",
-                Region = "Midwest",
-                Timezone = "America/Chicago"
+                PhoneNumber = "+18085553334",
+                Address = new Address { Street = "Makalapa Housing Area", City = "Joint Base Pearl Harbor-Hickam", State = "HI", ZipCode = "96860" },
+                Coordinates = new GeoCoordinates { Latitude = 21.3680, Longitude = -157.9420 },
+                LocationType = LocationType.Residential,
+                ServiceArea = "JBPHH",
+                Region = "Hawaii",
+                Timezone = "Pacific/Honolulu"
             }
         };
 
@@ -1004,9 +871,9 @@ public class SeededInMemoryCosmosDbService : ICosmosDbService
     private void SeedCallLogs()
     {
         var rng = new Random(42);
-        var callers = new[] { "+15551234567", "+15559876543", "+15552223333", "+15556667777", "+15558889999", "+15553334444", "+15557778888" };
-        var callerNames = new[] { "Oakwood Office Park", "City Fire Marshal", "Sunrise Senior Living", "Hilltop Apartments", "Regional Hospital", "Lincoln Elementary", "RDC Callback" };
-        var dids = new[] { "+18005551000", "+18005551001" };
+        var callers = new[] { "+18085551234", "+18085559876", "+18085552223", "+18085556667", "+18085558889", "+18085553334", "+18085557778" };
+        var callerNames = new[] { "JBPHH HQ", "Hickam 15th Wing", "West Loch Ops", "PMRF Barking Sands", "Tripler AMC", "Makalapa Housing", "RDC Callback" };
+        var dids = new[] { "+18085551000", "+18085551001" };
         var dispositions = new[] {
             CallDisposition.Completed,
             CallDisposition.TransferredToAgent,
@@ -1014,13 +881,13 @@ public class SeededInMemoryCosmosDbService : ICosmosDbService
             CallDisposition.CallerHangup,
             CallDisposition.TransferredToVdn
         };
-        var teams = new[] { "RDC Emergency", "Inspection Scheduling", "Maintenance", "Billing", null };
+        var teams = new[] { "RDC Emergency", "Alarm Administrator", "Fire Dispatch", "Police Dispatch", null };
         var menuPaths = new[] {
             new[] { ("menu-main", "1") },          // Emergency → RDC
-            new[] { ("menu-main", "2"), ("menu-inspection", "1") },  // Schedule inspection
-            new[] { ("menu-main", "3"), ("menu-maintenance", "1") }, // Report malfunction
-            new[] { ("menu-main", "3"), ("menu-maintenance", "2") }, // Check work order
-            new[] { ("menu-main", "4"), ("menu-billing", "1") },     // Check balance
+            new[] { ("menu-main", "2"), ("menu-alarm-admin", "1") },  // Alarm Admin → JBPHH
+            new[] { ("menu-main", "2"), ("menu-alarm-admin", "3") },  // Alarm Admin → West Loch
+            new[] { ("menu-main", "3"), ("menu-fire-dispatch", "1") }, // Fire → Fed Fire
+            new[] { ("menu-main", "4"), ("menu-police-dispatch", "1") }, // Police → JB Police
         };
 
         for (int i = 0; i < 30; i++)
@@ -1090,34 +957,34 @@ public class SeededInMemoryCosmosDbService : ICosmosDbService
             },
             new()
             {
-                Id = "team-inspection",
-                TeamName = "Inspection Scheduling",
-                Description = "Handles fire alarm inspection scheduling — annual, semi-annual, NFPA compliance inspections",
+                Id = "team-alarm-admin",
+                TeamName = "Alarm Administrator",
+                Description = "Handles alarm administration for LAMAS areas — Pearl Harbor, Hickam, West Loch, NCTAMS, PMRF",
                 TransferNumber = "+18005551001",
-                QueueName = "inspection-scheduling",
-                IntentKeywords = new List<string> { "inspection", "schedule", "annual", "test", "nfpa", "compliance", "certify", "appointment" },
+                QueueName = "alarm-admin-queue",
+                IntentKeywords = new List<string> { "alarm", "administrator", "lamas", "monitoring", "panel", "sensor", "alarm admin" },
                 Priority = 10,
                 IsActive = true
             },
             new()
             {
-                Id = "team-maintenance",
-                TeamName = "Maintenance & Repair",
-                Description = "Handles fire alarm system maintenance, repair, panel replacement, malfunction reports, and work orders",
+                Id = "team-fire-dispatch",
+                TeamName = "Fire Dispatch",
+                Description = "Fire dispatcher — Fed Fire and PMRF fire departments",
                 TransferNumber = "+18005551002",
-                QueueName = "maintenance-queue",
-                IntentKeywords = new List<string> { "malfunction", "repair", "broken", "panel", "trouble", "beeping", "fault", "work order", "replace", "upgrade" },
+                QueueName = "fire-dispatch-queue",
+                IntentKeywords = new List<string> { "fire", "fire dispatcher", "fed fire", "fire department", "fire truck", "blaze" },
                 Priority = 15,
                 IsActive = true
             },
             new()
             {
-                Id = "team-billing",
-                TeamName = "Account & Billing",
-                Description = "Handles account balances, payments, inspection reports, and invoicing",
+                Id = "team-police-dispatch",
+                TeamName = "Police Dispatch",
+                Description = "Police dispatcher — Joint Base Police and PMRF police departments",
                 TransferNumber = "+18005551003",
-                QueueName = "billing-queue",
-                IntentKeywords = new List<string> { "billing", "payment", "invoice", "balance", "report", "certificate", "account" },
+                QueueName = "police-dispatch-queue",
+                IntentKeywords = new List<string> { "police", "police dispatcher", "joint base police", "law enforcement", "security", "officer" },
                 Priority = 5,
                 IsActive = true
             }
