@@ -166,6 +166,32 @@ Purchase a phone number in Azure Communication Services and route it to trigger 
 8. **Menu action executed** — navigate, transfer, play, hangup
 9. **Call log recorded** with full menu path and ANI/ALI data
 
+## Documentation
+
+Comprehensive documentation is available in the [docs/](docs/) folder:
+
+### Core Documentation
+- **[Architecture Overview](docs/architecture.md)** — System design, call flow lifecycle, component responsibilities
+- **[Function App Guide](docs/function-app.md)** — Azure Functions deployment and configuration
+- **[System Integration](docs/system-integration.md)** — AI routing, external systems, PSTN connectivity, Avaya CM10 integration
+- **[Admin Portal](docs/admin-portal.md)** — Web UI for managing menus, prompts, ANI/ALI, call logs
+
+### Configuration & Setup
+- **[Azure Communication Services Configuration](docs/acs-configuration-guide.md)** — Complete guide for ACS setup, Event Grid, Direct Routing, SBC configuration
+- **[Custom Domain Quick Reference](docs/acs-custom-domain-quickref.md)** — Quick start for custom domain verification
+- **[Azure Government Deployment](docs/azure-gov-deployment.md)** — Azure Government-specific deployment notes
+- **[CM10 Setup Guide](docs/cm10-setup-guide.md)** — Avaya Communication Manager 10 integration
+
+### Azure Government Important Notes
+- **[Direct Routing Limitations](docs/azure-gov-direct-routing-limitation.md)** — Known limitations of ACS Direct Routing in Azure Government Cloud
+
+### Scripts
+- **[Configure-AcsCustomDomain.ps1](scripts/Configure-AcsCustomDomain.ps1)** — Automate custom domain setup for ACS Direct Routing
+
+### Development & Testing
+- **[Start Local Development](docs/startlocal.md)** — Running the IVR system locally
+- **[PSTN Simulator](docs/pstn-simulator.md)** — Test IVR without real phone calls
+
 ## License
 
 MIT
