@@ -29,7 +29,7 @@
     .\Configure-AcsCustomDomain.ps1 `
         -ResourceGroup "rg-ivr-dev" `
         -AcsResourceName "ivr-dev-acs-bld64pwxb4ukq" `
-        -CustomDomain "acs.devtest.us"
+        -CustomDomain "acs.tomazdev.us"
 
 .EXAMPLE
     # Automatic DNS management (Azure DNS only)

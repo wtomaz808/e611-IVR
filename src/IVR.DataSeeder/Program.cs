@@ -39,7 +39,14 @@ try
     Console.WriteLine($"   Database: {databaseName}");
     Console.WriteLine();
 
-    using var cosmosClient = new CosmosClient(connectionString);
+    // Create Cosmos Client with same serialization options as AdminPortal
+    using var cosmosClient = new CosmosClient(connectionString, new CosmosClientOptions
+    {
+        SerializerOptions = new CosmosSerializationOptions
+        {
+            PropertyNamingPolicy = CosmosPropertyNamingPolicy.CamelCase
+        }
+    });
     
     // Create logger factory
     using var loggerFactory = LoggerFactory.Create(builder => builder.AddConsole());
@@ -153,6 +160,68 @@ try
     totalErrors += aliErrors;
 
     // ========================================
+    // SEED MENUS (Call Flows)
+    // ========================================
+    var menus = MenuSeeder.GenerateTestMenus();
+    Console.WriteLine($"📋 SEEDING MENUS / CALL FLOWS ({menus.Count} total)");
+    Console.WriteLine("─────────────────────────────────────────────────────────");
+
+    int menuSuccess = 0;
+    int menuErrors = 0;
+
+    foreach (var menu in menus)
+    {
+        try
+        {
+            await cosmosService.UpsertMenuAsync(menu);
+            Console.WriteLine($"  ✅ {menu.Name} ({menu.MenuType})");
+            menuSuccess++;
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"  ❌ {menu.Name}: {ex.Message}");
+            menuErrors++;
+        }
+    }
+
+    Console.WriteLine($"  📊 Menus: {menuSuccess} succeeded, {menuErrors} failed");
+    Console.WriteLine();
+
+    totalSuccess += menuSuccess;
+    totalErrors += menuErrors;
+
+    // ========================================
+    // SEED TEAM ROUTING
+    // ========================================
+    var teamConfigs = TeamRoutingSeeder.GenerateTestTeamRoutingConfigs();
+    Console.WriteLine($"👥 SEEDING TEAM ROUTING ({teamConfigs.Count} total)");
+    Console.WriteLine("─────────────────────────────────────────────────────────");
+
+    int teamSuccess = 0;
+    int teamErrors = 0;
+
+    foreach (var team in teamConfigs)
+    {
+        try
+        {
+            await cosmosService.UpsertTeamRoutingConfigAsync(team);
+            Console.WriteLine($"  ✅ {team.TeamName} (Priority: {team.Priority})");
+            teamSuccess++;
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"  ❌ {team.TeamName}: {ex.Message}");
+            teamErrors++;
+        }
+    }
+
+    Console.WriteLine($"  📊 Team Routing: {teamSuccess} succeeded, {teamErrors} failed");
+    Console.WriteLine();
+
+    totalSuccess += teamSuccess;
+    totalErrors += teamErrors;
+
+    // ========================================
     // SUMMARY
     // ========================================
     Console.WriteLine("═══════════════════════════════════════════════════════════");
@@ -163,14 +232,19 @@ try
         Console.WriteLine($"   Total Errors: {totalErrors}");
     }
     Console.WriteLine("─────────────────────────────────────────────────────────");
-    Console.WriteLine($"   Prompts:      {promptSuccess}/{prompts.Count}");
-    Console.WriteLine($"   ANI Records:  {aniSuccess}/{aniRecords.Count}");
-    Console.WriteLine($"   ALI Records:  {aliSuccess}/{aliRecords.Count}");
+    Console.WriteLine($"   Prompts:        {promptSuccess}/{prompts.Count}");
+    Console.WriteLine($"   ANI Records:    {aniSuccess}/{aniRecords.Count}");
+    Console.WriteLine($"   ALI Records:    {aliSuccess}/{aliRecords.Count}");
+    Console.WriteLine($"   Menus:          {menuSuccess}/{menus.Count}");
+    Console.WriteLine($"   Team Routing:   {teamSuccess}/{teamConfigs.Count}");
     Console.WriteLine("═══════════════════════════════════════════════════════════");
     Console.WriteLine();
     Console.WriteLine("📋 Next steps:");
     Console.WriteLine("  1. Admin Portal → Prompts - View and test prompts");
     Console.WriteLine("  2. Admin Portal → ANI/ALI - Verify caller/location data");
+    Console.WriteLine("  3. Admin Portal → Call Flows - Review menu structure");
+    Console.WriteLine("  4. Admin Portal → Team Routing - Verify routing configs");
+    Console.WriteLine("  5. Admin Portal → Settings - Configure business hours");
     Console.WriteLine("  3. Admin Portal → Call Flows - Design call routing");
     Console.WriteLine("  4. Admin Portal → Settings - Configure business hours");
     Console.WriteLine();

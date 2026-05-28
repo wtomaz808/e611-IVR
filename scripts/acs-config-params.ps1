@@ -7,7 +7,7 @@
 $AcsParams = @{
     ResourceGroup  = "rg-ivr-dev"
     AcsResourceName = "ivr-dev-acs-bld64pwxb4ukq"
-    CustomDomain   = "acs.devtest.us"
+    CustomDomain   = "acs.tomazdev.us"
 }
 
 # Optional: Azure DNS Configuration (uncomment if using Azure DNS)

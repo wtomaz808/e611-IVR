@@ -1,15 +1,19 @@
 # Azure Communication Services Direct Routing in Azure Government
 
-## Issue Identified
+## Status Update
 
-**Date:** May 19, 2026  
+**Last Updated:** May 27, 2026  
+**Status:** ✅ **NOW AVAILABLE** - Direct Routing is supported in Azure Government  
+**Confirmed By:** Azure Communication Services Program Engineer  
 **Environment:** Azure US Government Cloud  
 **Subscription:** 78003893-6e88-4fa2-a8f0-315067f22e79  
 **ACS Resource:** ivr-dev-acs-bld64pwxb4ukq
 
-## Problem
+---
 
-When attempting to configure custom domains for Direct Routing in Azure Communication Services on Azure Government Cloud, the following error occurs:
+## Historical Context (May 19, 2026)
+
+When initially attempting to configure custom domains for Direct Routing in Azure Communication Services on Azure Government Cloud, the following error occurred:
 
 ```
 Response status code does not indicate success: 404 (Not Found).
@@ -21,26 +25,50 @@ Response status code does not indicate success: 404 (Not Found).
 }
 ```
 
-## Root Cause
+This was initially believed to be a feature availability limitation in Azure Government Cloud.
 
-**Azure Communication Services Direct Routing with custom domains is not yet available in Azure US Government Cloud.**
+## Resolution (May 27, 2026)
 
-This is a known limitation - many Azure services and features are GA (Generally Available) in commercial Azure but not yet released or still in preview in Azure Government regions. Direct Routing and custom domain support appears to fall into this category.
+**Confirmed with Azure Communication Services Program Engineer:** Direct Routing IS supported in Azure Government Cloud. The feature is available and working.
 
 ## Feature Availability Matrix
 
 | Feature | Commercial Azure | Azure Government |
 |---------|------------------|------------------|
 | Azure Communication Services (basic) | ✅ GA | ✅ GA |
-| Call Automation SDK | ✅ GA | ✅ GA (confirmed working in your code) |
-| Event Grid Integration | ✅ GA | ✅ GA (confirmed working in your code) |
-| **Direct Routing** | ✅ GA | ❓ Limited/Not Available |
-| **Custom Domains** | ✅ GA | ❌ Not Available |
+| Call Automation SDK | ✅ GA | ✅ GA (confirmed working) |
+| Event Grid Integration | ✅ GA | ✅ GA (confirmed working) |
+| **Direct Routing** | ✅ GA | ✅ **NOW AVAILABLE** |
+| **Custom Domains** | ✅ GA | ✅ **NOW AVAILABLE** |
 | Phone Numbers (ACS-native) | ✅ GA | ⚠️ Limited availability |
 
-## Alternative Approaches
+---
 
-### Option 1: Use Native ACS Phone Numbers (Recommended for testing)
+## Next Steps
+
+To configure Direct Routing for your ACS resource in Azure Government:
+
+1. **Follow the ACS Configuration Guide**  
+   Complete documentation: [`docs/acs-configuration-guide.md`](acs-configuration-guide.md)
+
+2. **Use the Automated Configuration Script**  
+   ```powershell
+   # From the scripts directory
+   cd scripts
+   .\Run-AcsConfiguration.ps1
+   ```
+
+3. **Prerequisites for Direct Routing**
+   - ✅ A domain name you own with DNS management access
+   - ✅ Ability to add TXT records to your DNS
+   - ✅ Session Border Controller (SBC) with TLS certificate
+   - ✅ Avaya Call Manager or other telephony system
+
+---
+
+## Historical Alternative Approaches
+
+### Option 1: Use Native ACS Phone Numbers (For testing without Direct Routing)
 
 If Direct Routing isn't required yet, you can use phone numbers purchased directly through ACS:
 
