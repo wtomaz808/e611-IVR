@@ -1,62 +1,94 @@
-# IVR System — Azure Integrated
+# IVR System — Teams-Integrated
 
-A multi-level IVR (Interactive Voice Response) system built on Azure with ANI/ALI data support and a Blazor Server admin portal.
+A multi-level IVR (Interactive Voice Response) system for E911 call handling, built on Azure. Inbound PSTN calls are received by **Microsoft Teams Phone System** and routed to an **Azure Functions calling bot** that drives ANI/ALI lookup, configurable menu navigation, AI-powered intent routing, and external system integration — all managed through a Blazor Server admin portal.
+
+> **Architecture change (July 2026):** Azure Communication Services (ACS) has been replaced with a Microsoft Teams Calling Bot + Microsoft Graph API. The IVR business logic, Cosmos DB schema, OpenAI integration, and Admin Portal are unchanged.
 
 ## Architecture
 
 ```
-┌─────────────────────────────────────────────────────────────────┐
-│                        Azure Cloud                              │
-│                                                                 │
-│  ┌──────────────┐    ┌───────────────┐    ┌──────────────────┐  │
-│  │ Azure Comm.  │───▶│ Azure Event   │───▶│ Azure Functions  │  │
-│  │ Services     │    │ Grid          │    │ (IVR Engine)     │  │
-│  │ (PSTN/SIP)   │    └───────────────┘    │                  │  │
-│  └──────────────┘                         │ • Call Handler   │  │
-│                                           │ • ANI/ALI Lookup │  │
-│  ┌──────────────┐                         │ • Menu Engine    │  │
-│  │ Cognitive    │◀────────────────────────│ • DTMF/Speech    │  │
-│  │ Services     │                         └────────┬─────────┘  │
-│  │ (TTS/STT)   │                                   │            │
-│  └──────────────┘                                   ▼            │
-│                                           ┌──────────────────┐  │
-│  ┌──────────────┐                         │ Cosmos DB        │  │
-│  │ Blob Storage │◀────────────────────────│ • ANI Records    │  │
-│  │ (Audio       │                         │ • ALI Records    │  │
-│  │  Prompts)    │                         │ • Menus/Prompts  │  │
-│  └──────────────┘                         │ • Call Logs      │  │
-│                                           │ • Config         │  │
-│  ┌──────────────┐                         └──────────────────┘  │
-│  │ App Service  │                                   ▲            │
-│  │ (Blazor      │───────────────────────────────────┘            │
-│  │  Admin)      │                                                │
-│  └──────────────┘                                                │
-│                                                                 │
-│  ┌──────────────┐    ┌───────────────┐                          │
-│  │ Azure AD     │    │ App Insights  │                          │
-│  │ (Auth)       │    │ (Monitoring)  │                          │
-│  └──────────────┘    └───────────────┘                          │
-└─────────────────────────────────────────────────────────────────┘
+PSTN Carrier
+     |
+Teams Phone System  (Calling Plans or Operator Connect — no customer SBC needed)
+     |
+Teams Resource Account  (holds the phone number)
+     |
+Azure Bot Service  (routes incoming call notification to Function App)
+     |
+Azure Functions — TeamsCallBot  (HTTP trigger /api/bot-messages)
+├─ ANI/ALI lookup  ─► Cosmos DB
+├─ Answers call    ─► Microsoft Graph API  POST /communications/calls/{id}/answer
+├─ Plays prompts   ─► Microsoft Graph API  POST .../playPrompt
+│   ├─ TTS text    ─► Azure Cognitive Services (Neural Voice)
+│   └─ Audio file  ─► Azure Blob Storage (.wav/.mp3)
+├─ Collects DTMF   ─► Microsoft Graph API  POST .../recordResponse
+├─ Speech input    ─► Azure Cognitive Services (STT) ─► transcript string
+├─ AI routing      ─► Azure OpenAI GPT-4.1  (intent classification)
+├─ Call transfer   ─► Microsoft Graph API  POST .../transfer
+└─ Call logs       ─► Cosmos DB
+```
+
+```
++-------------------------------------------------------------------+
+|                          Azure Cloud                              |
+|                                                                   |
+|  +------------------+    +-------------------------------------+  |
+|  | Azure Bot Service|───►| Azure Functions (IVR Engine)        |  |
+|  | (channel reg.)   |    |                                     |  |
+|  +------------------+    | • TeamsCallBot  (Bot Framework)     |  |
+|                           | • CallFlowEngine                    |  |
+|  +------------------+    | • AniAliService                     |  |
+|  | Microsoft Graph  |◄──►| • TranscriptRoutingService          |  |
+|  | Calling API      |    | • ExternalSystemIntegration         |  |
+|  +------------------+    | • PromptService                     |  |
+|                           +------------------+------------------+  |
+|  +------------------+                       |                     |
+|  | Cognitive Svcs   |◄──────────────────────+  TTS / STT         |
+|  | (Speech)         |                       |                     |
+|  +------------------+                       v                     |
+|                           +-------------------------------------+  |
+|  +------------------+    | Cosmos DB (Serverless)              |  |
+|  | Azure Blob       |◄──►| • AniRecords   • Menus              |  |
+|  | Storage          |    | • AliRecords   • Prompts            |  |
+|  | (Audio Prompts)  |    | • CallLogs     • TeamRouting        |  |
+|  +------------------+    | • Config       • PhoneNumbers       |  |
+|                           +-------------------------------------+  |
+|  +------------------+                       ^                     |
+|  | Azure OpenAI     |◄──────────────────────+  AI intent         |
+|  | (GPT-4.1)        |                                             |
+|  +------------------+    +-------------------------------------+  |
+|                           | App Service (Blazor Admin Portal)   |  |
+|  +------------------+    | Manages menus, prompts, ANI/ALI,    |  |
+|  | Entra ID (Auth)  |───►| call logs, team routing, settings   |  |
+|  +------------------+    +-------------------------------------+  |
+|                                                                   |
+|  +------------------+                                            |
+|  | App Insights     | Telemetry for all components               |
+|  +------------------+                                            |
++-------------------------------------------------------------------+
 ```
 
 ## Project Structure
 
 ```
-ivr-system/
+e911-ivr/
 ├── src/
-│   ├── IVR.Core/                    # Shared library
-│   │   ├── Models/                  # ANI, ALI, CallLog, Menu, Prompt models
+│   ├── IVR.Core/                    # Shared library — zero Azure calling dependencies
+│   │   ├── Models/                  # ANI, ALI, CallLog, Menu, Prompt, TeamRouting models
 │   │   ├── Services/                # Cosmos DB, Blob Storage services
 │   │   └── Interfaces/              # Service contracts
 │   │
-│   ├── IVR.Functions/               # Azure Functions (IVR engine)
+│   ├── IVR.Functions/               # Azure Functions — IVR engine + Teams calling bot
 │   │   ├── Functions/
-│   │   │   ├── IncomingCallHandler  # Event Grid trigger for incoming calls
-│   │   │   └── CallbackHandler      # HTTP callback for call events
+│   │   │   └── TeamsCallBot.cs      # Bot Framework HTTP trigger (/api/bot-messages)
+│   │   │                            # Handles: incoming call, connected, DTMF, speech,
+│   │   │                            #          play completed, transfer, disconnect
 │   │   └── Services/
-│   │       ├── AniAliService        # ANI/ALI lookup & caller resolution
-│   │       ├── CallFlowEngine       # Menu routing, conditions, business hours
-│   │       └── PromptService        # TTS/audio prompt resolution
+│   │       ├── AniAliService              # ANI/ALI lookup & caller resolution
+│   │       ├── CallFlowEngine             # Menu routing, conditions, business hours
+│   │       ├── PromptService              # TTS / audio prompt resolution
+│   │       ├── TranscriptRoutingService   # Azure OpenAI speech intent classification
+│   │       └── ExternalSystemIntegration  # REST dispatch to external APIs
 │   │
 │   ├── IVR.AdminPortal/             # Blazor Server admin portal
 │   │   └── Pages/
@@ -65,6 +97,7 @@ ivr-system/
 │   │       ├── CallFlows/           # Visual menu tree builder
 │   │       ├── AniAli/              # ANI/ALI record CRUD
 │   │       ├── CallLogs/            # Call history & detail viewer
+│   │       ├── Teams/               # Team routing configuration
 │   │       └── Settings/            # Business hours, holidays, system config
 │   │
 │   └── IVR.sln
@@ -72,69 +105,109 @@ ivr-system/
 ├── infra/                           # Bicep IaC templates
 │   ├── main.bicep                   # Main orchestrator
 │   ├── modules/
+│   │   ├── bot-service.bicep        # Azure Bot Service + Teams channel (calling enabled)
 │   │   ├── cosmos-db.bicep          # Cosmos DB + containers
-│   │   ├── storage.bicep            # Blob storage for audio
-│   │   ├── communication-services   # Azure Communication Services
-│   │   ├── cognitive-services       # Speech TTS/STT
+│   │   ├── storage.bicep            # Blob storage for audio prompts
+│   │   ├── cognitive-services.bicep # Speech TTS/STT
+│   │   ├── openai.bicep             # Azure OpenAI (GPT-4.1)
 │   │   ├── function-app.bicep       # Function App hosting
 │   │   ├── app-service.bicep        # Admin portal hosting
 │   │   └── app-insights.bicep       # Monitoring
 │   └── parameters/
-│       └── dev.bicepparam
+│       ├── azuregov.bicepparam      # Azure Government (GCC High) parameters
+│       └── dev.bicepparam           # Commercial dev parameters
 │
-└── .github/workflows/deploy.yml     # CI/CD pipeline
+├── scripts/
+│   ├── Create-BotAppRegistration.ps1  # Creates Entra App Registration for the bot
+│   └── README.md
+│
+└── docs/                            # Full documentation
 ```
 
-## Features
+## Azure Services Required
 
-### IVR Engine
-- **ANI/ALI Lookup** — Automatic caller identification and location resolution
-- **Multi-Level Menus** — Nested menu trees with DTMF and speech input
-- **Conditional Routing** — Route by caller type, VIP status, region, business hours
-- **Business Hours** — Time-based routing with after-hours and holiday menus
-- **VIP Routing** — Custom call flows for priority callers
-- **Blocked Callers** — Automatic call rejection for blocked numbers
-
-### Admin Portal
-- **Dashboard** — Real-time call stats, disposition charts, hourly volume
-- **Prompt Manager** — Create/edit TTS text, upload audio files, SSML support
-- **Call Flow Builder** — Visual menu tree with drag-and-drop options
-- **ANI/ALI Manager** — CRUD for caller records, bulk CSV import
-- **Call Logs** — Searchable history with full menu path tracking
-- **Settings** — Business hours, holidays, global config
+| Service | Purpose | Notes |
+|---|---|---|
+| **Azure Bot Service** (S1) | Registers calling bot, enables Teams channel | Deployed via Bicep |
+| **Azure Functions** (v4) | IVR engine — TeamsCallBot + all IVR services | .NET 8 isolated worker |
+| **Microsoft Graph API** | Call control (answer, play, DTMF, transfer, hangup) | App-only auth via Entra |
+| **Teams Phone System** | PSTN reception via Calling Plans or Operator Connect | M365 admin config |
+| **Cosmos DB** (Serverless) | All IVR configuration and call logs | |
+| **Azure Blob Storage** | Pre-recorded audio prompt files (.wav/.mp3) | |
+| **Azure Cognitive Services** | TTS (Neural Voice) + STT (speech recognition) | |
+| **Azure OpenAI** (GPT-4.1) | AI intent classification for speech-routed calls | |
+| **App Service** | Blazor admin portal | |
+| **Entra ID** | Admin portal auth + Bot App Registration | Run Create-BotAppRegistration.ps1 |
+| **Application Insights** | Telemetry + logging | |
 
 ## Prerequisites
 
 - [.NET 8 SDK](https://dotnet.microsoft.com/download/dotnet/8.0)
 - [Azure CLI](https://docs.microsoft.com/cli/azure/install-azure-cli)
 - [Azure Functions Core Tools v4](https://docs.microsoft.com/azure/azure-functions/functions-run-local)
-- Azure subscription with these services enabled:
-  - Azure Communication Services (with PSTN numbers)
-  - Azure Cognitive Services (Speech)
-  - Azure Cosmos DB
-  - Azure Blob Storage
+- Microsoft 365 tenant with **Teams Phone System** license (E5 or Phone System add-on)
+- Azure subscription (commercial or Azure Government / GCC High)
 
 ## Getting Started
 
-### 1. Deploy Infrastructure
+### 1. Create the Bot App Registration
 
-```bash
+Run this **before** deploying infrastructure. Creates the Entra App Registration with the required Microsoft Graph calling permissions (`Calls.Initiate.All`, `Calls.AccessMedia.All`, etc.).
+
+```powershell
+# Azure Government (GCC High)
+az cloud set --name AzureUSGovernment
 az login
-az group create --name rg-ivr-dev --location eastus
-
-az deployment group create \
-  --resource-group rg-ivr-dev \
-  --template-file infra/main.bicep \
-  --parameters infra/parameters/dev.bicepparam
+cd scripts
+.\Create-BotAppRegistration.ps1 -Environment AzureUSGovernment
 ```
 
-### 2. Configure Local Development
+Copy the output `teamsBotAppId` and `teamsBotAppPassword` into your `.bicepparam` file.
 
-Update connection strings in:
-- `src/IVR.Functions/local.settings.json`
-- `src/IVR.AdminPortal/appsettings.json`
+### 2. Deploy Infrastructure
 
-### 3. Run Locally
+```powershell
+az group create --name rg-ivr-dev --location usgovarizona
+
+az deployment group create `
+  --resource-group rg-ivr-dev `
+  --template-file infra/main.bicep `
+  --parameters infra/parameters/azuregov.bicepparam
+```
+
+### 3. Configure Teams Phone System (M365 Admin Center)
+
+1. Create a **Resource Account** and assign it the phone number
+2. Assign a **Calling Policy** to the Resource Account that allows bot calls
+3. Set the **calling webhook** to the bot messaging endpoint from the Bicep deployment output:
+   `https://<functionapp>.azurewebsites.us/api/bot-messages`
+
+### 4. Configure Local Development
+
+Create `src/IVR.Functions/local.settings.json`:
+
+```json
+{
+  "IsEncrypted": false,
+  "Values": {
+    "AzureWebJobsStorage": "UseDevelopmentStorage=true",
+    "FUNCTIONS_WORKER_RUNTIME": "dotnet-isolated",
+    "MicrosoftAppType": "SingleTenant",
+    "MicrosoftAppId": "<bot-app-id>",
+    "MicrosoftAppPassword": "<bot-app-secret>",
+    "MicrosoftAppTenantId": "<tenant-id>",
+    "ChannelService": "https://botframework.azure.us",
+    "GraphApiEndpoint": "https://graph.microsoft.us/v1.0",
+    "CosmosDbConnectionString": "<cosmos-connection-string>",
+    "CognitiveServicesEndpoint": "<speech-endpoint>",
+    "AzureOpenAI__Endpoint": "<openai-endpoint>",
+    "AzureOpenAI__ApiKey": "<openai-key>",
+    "AzureOpenAI__DeploymentName": "gpt-41"
+  }
+}
+```
+
+### 5. Run Locally
 
 ```bash
 # Terminal 1: Run Functions
@@ -146,51 +219,29 @@ cd src/IVR.AdminPortal
 dotnet run
 ```
 
-### 4. Configure Event Grid
-
-Register the Function App endpoint as an Event Grid subscription for your Azure Communication Services resource's `Microsoft.Communication.IncomingCall` event.
-
-### 5. Configure PSTN
-
-Purchase a phone number in Azure Communication Services and route it to trigger the IVR.
-
 ## Call Flow
 
-1. **Incoming call** arrives at Azure Communication Services
-2. **Event Grid** triggers the `IncomingCallHandler` function
-3. **ANI/ALI lookup** identifies the caller and their location
-4. **Business hours check** determines if the office is open
-5. **Menu resolution** selects the appropriate IVR menu based on conditions
-6. **Call answered** and welcome prompt played
-7. **DTMF/speech collection** captures caller input
-8. **Menu action executed** — navigate, transfer, play, hangup
-9. **Call log recorded** with full menu path and ANI/ALI data
+1. Caller dials the DID assigned to the Teams Resource Account
+2. **Teams Phone System** receives the PSTN call (Calling Plan or Operator Connect)
+3. **Azure Bot Service** delivers an `onIncomingCall` activity to `/api/bot-messages`
+4. **TeamsCallBot** — ANI/ALI lookup, blocked check, answers call via Graph API
+5. **Graph API** confirms `callConnected` — bot plays welcome prompt (TTS or audio file)
+6. **Graph API** collects DTMF or speech from caller
+7. **CallFlowEngine** navigates the menu tree based on caller input
+8. Speech input — **Azure OpenAI** classifies intent and routes to matched team
+9. **Graph API** transfers call to Teams user, Call Queue, or PSTN number
+10. **Cosmos DB** call log updated with full path, transcript, intent, and disposition
 
 ## Documentation
 
-Comprehensive documentation is available in the [docs/](docs/) folder:
+Full documentation is in the [docs/](docs/) folder:
 
-### Core Documentation
-- **[Architecture Overview](docs/architecture.md)** — System design, call flow lifecycle, component responsibilities
-- **[Function App Guide](docs/function-app.md)** — Azure Functions deployment and configuration
-- **[System Integration](docs/system-integration.md)** — AI routing, external systems, PSTN connectivity, Avaya CM10 integration
-- **[Admin Portal](docs/admin-portal.md)** — Web UI for managing menus, prompts, ANI/ALI, call logs
-
-### Configuration & Setup
-- **[Azure Communication Services Configuration](docs/acs-configuration-guide.md)** — Complete guide for ACS setup, Event Grid, Direct Routing, SBC configuration
-- **[Custom Domain Quick Reference](docs/acs-custom-domain-quickref.md)** — Quick start for custom domain verification
-- **[Azure Government Deployment](docs/azure-gov-deployment.md)** — Azure Government-specific deployment notes
-- **[CM10 Setup Guide](docs/cm10-setup-guide.md)** — Avaya Communication Manager 10 integration
-
-### Azure Government Important Notes
-- **[Direct Routing Limitations](docs/azure-gov-direct-routing-limitation.md)** — Known limitations of ACS Direct Routing in Azure Government Cloud
-
-### Scripts
-- **[Configure-AcsCustomDomain.ps1](scripts/Configure-AcsCustomDomain.ps1)** — Automate custom domain setup for ACS Direct Routing
-
-### Development & Testing
-- **[Start Local Development](docs/startlocal.md)** — Running the IVR system locally
-- **[PSTN Simulator](docs/pstn-simulator.md)** — Test IVR without real phone calls
+- **[Architecture Overview](docs/architecture.md)** — System design and call flow lifecycle
+- **[System Integration](docs/system-integration.md)** — AI routing, external systems, team routing
+- **[Admin Portal](docs/admin-portal.md)** — Managing menus, prompts, ANI/ALI, call logs
+- **[Azure Government Deployment](docs/azure-gov-deployment.md)** — GCC High specific notes
+- **[Start Local Development](docs/startlocal.md)** — Running locally
+- **[PSTN Simulator](docs/pstn-simulator.md)** — Test without real phone calls
 
 ## License
 

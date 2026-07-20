@@ -1,5 +1,4 @@
 using Azure.AI.OpenAI;
-using Azure.Communication.CallAutomation;
 using Azure.Identity;
 using Azure.Storage.Blobs;
 using IVR.Core.Interfaces;
@@ -7,9 +6,12 @@ using IVR.Core.Services;
 using IVR.Functions.Services;
 using Microsoft.Azure.Cosmos;
 using Microsoft.Azure.Functions.Worker;
+using Microsoft.Bot.Builder.Integration.AspNet.Core;
+using Microsoft.Bot.Connector.Authentication;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+using Microsoft.Graph;
 
 var host = new HostBuilder()
     .ConfigureFunctionsWebApplication()
@@ -18,18 +20,59 @@ var host = new HostBuilder()
         services.AddApplicationInsightsTelemetryWorkerService();
         services.ConfigureFunctionsApplicationInsights();
 
-        // ─── Azure Communication Services ───────────────────────
-        var acsConnectionString = context.Configuration["AcsConnectionString"];
-        if (!string.IsNullOrEmpty(acsConnectionString))
+        // ─── Bot Framework — Teams Calling adapter ───────────────
+        // CloudAdapter reads the following from IConfiguration
+        // (all set via Function App settings in infra/modules/function-app.bicep):
+        //   MicrosoftAppType     = SingleTenant
+        //   MicrosoftAppId       = Entra App Registration client ID
+        //   MicrosoftAppPassword = Entra App Registration client secret
+        //   MicrosoftAppTenantId = Entra tenant ID
+        //   ChannelService       = https://botframework.azure.us  (GCC High)
+        //                          (empty = commercial Azure)
+        // The adapter validates every inbound Teams request JWT before
+        // dispatching to TeamsCallBot.
+        services.AddSingleton<BotFrameworkAuthentication, ConfigurationBotFrameworkAuthentication>();
+        services.AddSingleton<IBotFrameworkHttpAdapter, CloudAdapter>();
+
+        // ─── Microsoft Graph — call control ─────────────────────
+        // GraphServiceClient issues the commands that actually control
+        // the Teams call: answer, playPrompt, recordResponse, transfer,
+        // and delete (hang up).
+        //
+        // Auth uses ClientSecretCredential (app-only, no user sign-in).
+        // Authority host is automatically selected for GCC High vs commercial.
+        var botAppId       = context.Configuration["MicrosoftAppId"];
+        var botAppPassword = context.Configuration["MicrosoftAppPassword"];
+        var botTenantId    = context.Configuration["MicrosoftAppTenantId"];
+        var graphEndpoint  = context.Configuration["GraphApiEndpoint"]
+                             ?? "https://graph.microsoft.com/v1.0";
+
+        if (!string.IsNullOrEmpty(botAppId) && !string.IsNullOrEmpty(botAppPassword)
+                                             && !string.IsNullOrEmpty(botTenantId))
         {
-            services.AddSingleton(new CallAutomationClient(acsConnectionString));
+            var isGovCloud   = graphEndpoint.Contains("microsoft.us", StringComparison.OrdinalIgnoreCase);
+            var authorityHost = isGovCloud
+                ? AzureAuthorityHosts.AzureGovernment
+                : AzureAuthorityHosts.AzurePublicCloud;
+
+            var credential = new ClientSecretCredential(
+                botTenantId, botAppId, botAppPassword,
+                new ClientSecretCredentialOptions { AuthorityHost = authorityHost });
+
+            services.AddSingleton(new GraphServiceClient(credential, baseUrl: graphEndpoint));
         }
         else
         {
-            // Mock mode — point ACS SDK at the PSTN Simulator's mock REST API
-            var mockAcsEndpoint = context.Configuration["MockAcsEndpoint"] ?? "http://pstn-simulator:8080";
-            var mockConnStr = $"endpoint={mockAcsEndpoint};accesskey=bW9ja2tleQ==";
-            services.AddSingleton(new CallAutomationClient(mockConnStr));
+            // Local / CI mode without bot credentials configured.
+            // TeamsCallBot checks for null and skips Graph calls with a warning.
+            services.AddSingleton<GraphServiceClient>(_ =>
+            {
+                var logger = _.GetRequiredService<ILogger<GraphServiceClient>>();
+                logger.LogWarning(
+                    "GraphServiceClient not configured — MicrosoftAppId/Password/TenantId missing. " +
+                    "Teams call control will be disabled. Set these values for production.");
+                return null!;
+            });
         }
 
         // ─── Cosmos DB ──────────────────────────────────────────
