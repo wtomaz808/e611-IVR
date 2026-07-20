@@ -1,0 +1,459 @@
+using System.Text;
+using System.Text.Json;
+using PstnSimulator.Models;
+
+namespace PstnSimulator.Services;
+
+/// <summary>
+/// Teams calling bot simulation — mirrors what Microsoft Teams does when a PSTN call
+/// arrives for a Teams Resource Account.
+///
+/// Instead of sending ACS EventGrid payloads, this bridge sends Microsoft Graph
+/// commsNotifications JSON to the IVR's /api/bot-messages endpoint.
+///
+/// The simulator also exposes a mock Microsoft Graph Calling API at /graph/v1.0
+/// (configured via GraphApiEndpoint in IVR.Functions local.settings.json) so the
+/// IVR's GraphServiceClient connects to the simulator rather than real Azure.
+///
+/// Flow:
+///   1. OriginateCallAsync  → POST /api/bot-messages  (state: "incoming")
+///   2. IVR calls /graph/.../answer  → simulate receives it → POST "established"
+///   3. IVR calls /graph/.../playPrompt → simulate → POST "playPromptOperation completed"
+///   4. SendDtmfAsync       → POST /api/bot-messages  (toneInfo in call notification)
+///   5. SendSpeechAsync     → sets transcript, POST "recordOperation completed"
+///   6. DisconnectAsync     → POST /api/bot-messages  (state: "terminated")
+/// </summary>
+public class MockTeamsBridge : IAcsBridge
+{
+    private readonly CallStateManager _callManager;
+    private readonly IHttpClientFactory _httpClientFactory;
+    private readonly IConfiguration _config;
+    private readonly ILogger<MockTeamsBridge> _logger;
+
+    // Tracks which callId is waiting for a specific Graph API call
+    // Key = callId, Value = next expected operation
+    private readonly Dictionary<string, string> _pendingOps = new();
+
+    public MockTeamsBridge(
+        CallStateManager callManager,
+        IHttpClientFactory httpClientFactory,
+        IConfiguration config,
+        ILogger<MockTeamsBridge> logger)
+    {
+        _callManager       = callManager;
+        _httpClientFactory = httpClientFactory;
+        _config            = config;
+        _logger            = logger;
+    }
+
+    // ════════════════════════════════════════════════════════════
+    //  IAcsBridge implementation
+    // ════════════════════════════════════════════════════════════
+
+    /// <summary>Originate: send a Graph commsNotification with state="incoming".</summary>
+    public async Task<bool> OriginateCallAsync(SimulatedCall call)
+    {
+        var ivrEndpoint = _config["IvrEndpoint"] ?? "http://localhost:7071";
+
+        _callManager.GetCall(call.Id); // ensure call is accessible via manager
+        _pendingOps[call.Id] = "waiting_answer";
+
+        var payload = BuildCallStateNotification(call.Id, "incoming",
+            callerNumber: call.CallerNumber,
+            calledNumber: call.DidNumber);
+
+        call.TransitionTo(CallState.SentToIvr, CallEventSource.Acs,
+            "commsNotification (incoming) sent to Teams bot",
+            $"POST {ivrEndpoint}/api/bot-messages");
+
+        return await PostToBotEndpointAsync(ivrEndpoint, payload, call,
+            "Teams commsNotification (incoming)");
+    }
+
+    /// <summary>DTMF: send a toneInfo notification inside a call state update.</summary>
+    public async Task SendDtmfAsync(string callId, string tone)
+    {
+        var call = _callManager.GetCall(callId);
+        if (call == null) return;
+
+        var ivrEndpoint = _config["IvrEndpoint"] ?? "http://localhost:7071";
+
+        // Map simulator digit to Graph tone enum string
+        var graphTone = MapDigitToGraphTone(tone);
+        call.DtmfInputs.Add(tone);
+        call.AddEvent(CallEventSource.Pstn, $"DTMF: {tone} → Graph tone: {graphTone}");
+
+        var payload = BuildToneNotification(callId, graphTone);
+        await PostToBotEndpointAsync(ivrEndpoint, payload, call,
+            $"Teams toneInfo ({graphTone})");
+    }
+
+    /// <summary>
+    /// Speech: store transcript in call state, then send a recordOperation
+    /// completed notification so the bot processes the speech.
+    /// </summary>
+    public async Task SendSpeechAsync(string callId, string text)
+    {
+        var call = _callManager.GetCall(callId);
+        if (call == null) return;
+
+        var ivrEndpoint = _config["IvrEndpoint"] ?? "http://localhost:7071";
+
+        call.SpeechInputs.Add(text);
+        call.AddEvent(CallEventSource.Pstn, $"Speech: \"{text}\"");
+
+        // Store the transcript so the IVR can retrieve it from CallLog.Metadata.
+        // The bot reads MetaPendingSpeech from Cosmos; in simulator mode we inject
+        // the transcript directly into the recordOperation notification via clientContext.
+        var operationId = Guid.NewGuid().ToString();
+        var payload = BuildRecordOperationNotification(callId, operationId, text);
+        await PostToBotEndpointAsync(ivrEndpoint, payload, call,
+            $"Teams recordOperation completed (transcript: \"{text}\")");
+    }
+
+    /// <summary>Disconnect: send a terminated state notification.</summary>
+    public async Task DisconnectAsync(string callId)
+    {
+        var call = _callManager.GetCall(callId);
+        if (call == null) return;
+
+        var ivrEndpoint = _config["IvrEndpoint"] ?? "http://localhost:7071";
+        call.AddEvent(CallEventSource.Pstn, "Caller disconnected");
+
+        var payload = BuildCallStateNotification(callId, "terminated");
+        await PostToBotEndpointAsync(ivrEndpoint, payload, call,
+            "Teams commsNotification (terminated)");
+    }
+
+    // ════════════════════════════════════════════════════════════
+    //  Mock Graph Calling API request handler
+    //  Called from simulator Program.cs for /graph/v1.0/* routes
+    // ════════════════════════════════════════════════════════════
+
+    /// <summary>
+    /// Handle an IVR Graph API call.  The IVR's GraphServiceClient is configured to
+    /// point at the simulator (GraphApiEndpoint = http://pstn-simulator:8080/graph/v1.0).
+    /// After each command, fire the appropriate follow-up notification back to the IVR.
+    /// </summary>
+    public async Task<IResult> HandleGraphApiAsync(HttpContext ctx, string path)
+    {
+        _logger.LogInformation("Mock Graph API: {Method} /graph/v1.0/{Path}", ctx.Request.Method, path);
+
+        // Extract call ID from path: communications/calls/{callId}[/action]
+        var callId = ExtractCallId(path);
+        if (callId == null)
+            return Results.Ok(); // Non-call path (e.g. token endpoints)
+
+        var action = path.Contains('/') ? path[(path.LastIndexOf('/') + 1)..] : null;
+        var call   = callId != null ? _callManager.GetCall(callId) : null;
+
+        // DELETE = hang up
+        if (ctx.Request.Method == "DELETE")
+        {
+            call?.TransitionTo(CallState.Disconnected, CallEventSource.Ivr, "Graph DELETE (hang up)");
+            return Results.NoContent();
+        }
+
+        return action switch
+        {
+            "answer" => await HandleAnswerAsync(callId!, call),
+            "playPrompt" => await HandlePlayPromptAsync(ctx, callId!, call),
+            "subscribeToTone" => HandleSubscribeToTone(callId!, call),
+            "recordResponse" => HandleRecordResponse(callId!, call),
+            "transfer" => await HandleTransferAsync(ctx, callId!, call),
+            "reject" => HandleReject(callId!, call),
+            _ => Results.Ok()
+        };
+    }
+
+    // ── Graph API action handlers ────────────────────────────────────────────
+
+    private async Task<IResult> HandleAnswerAsync(string callId, SimulatedCall? call)
+    {
+        call?.TransitionTo(CallState.IvrAnswered, CallEventSource.Ivr, "Graph answer");
+
+
+        // Fire "established" notification after a short delay
+        _ = Task.Run(async () =>
+        {
+            await Task.Delay(300);
+            var ivrEndpoint = _config["IvrEndpoint"] ?? "http://localhost:7071";
+            var payload = BuildCallStateNotification(callId, "established");
+            await PostToBotEndpointRawAsync(ivrEndpoint, payload);
+        });
+
+        return Results.Ok(new { id = callId, state = "establishing" });
+    }
+
+    private async Task<IResult> HandlePlayPromptAsync(HttpContext ctx, string callId, SimulatedCall? call)
+    {
+        using var reader = new StreamReader(ctx.Request.Body);
+        var body = await reader.ReadToEndAsync();
+
+        _logger.LogInformation("PlayPrompt for call {CallId}: {Body}", callId, body[..Math.Min(200, body.Length)]);
+        call?.AddEvent(CallEventSource.Ivr, "Graph playPrompt");
+
+        var operationId = Guid.NewGuid().ToString();
+
+        // Fire "playPromptOperation completed" after a short delay
+        _ = Task.Run(async () =>
+        {
+            await Task.Delay(500); // Simulate prompt playing
+            var ivrEndpoint = _config["IvrEndpoint"] ?? "http://localhost:7071";
+            var payload = BuildPlayPromptOperationNotification(callId, operationId);
+            await PostToBotEndpointRawAsync(ivrEndpoint, payload);
+        });
+
+        return Results.Accepted($"/graph/v1.0/communications/calls/{callId}/operations/{operationId}",
+            new { id = operationId, status = "running" });
+    }
+
+    private IResult HandleSubscribeToTone(string callId, SimulatedCall? call)
+    {
+        _pendingOps[callId] = "subscribed_to_tone";
+        call?.AddEvent(CallEventSource.Ivr, "Graph subscribeToTone — simulator ready for DTMF");
+        return Results.Accepted(value: new { id = Guid.NewGuid().ToString(), status = "running" });
+    }
+
+    private IResult HandleRecordResponse(string callId, SimulatedCall? call)
+    {
+        _pendingOps[callId] = "recording";
+        call?.AddEvent(CallEventSource.Ivr, "Graph recordResponse — simulator ready for speech");
+        return Results.Accepted(value: new { id = Guid.NewGuid().ToString(), status = "running" });
+    }
+
+    private async Task<IResult> HandleTransferAsync(HttpContext ctx, string callId, SimulatedCall? call)
+    {
+        using var reader = new StreamReader(ctx.Request.Body);
+        var body = await reader.ReadToEndAsync();
+        _logger.LogInformation("Transfer call {CallId}: {Body}", callId, body[..Math.Min(200, body.Length)]);
+
+        call?.TransitionTo(CallState.IvrTransfer, CallEventSource.Ivr, "Graph transfer", body);
+
+        // Fire "terminated" after a short delay to simulate transfer completing
+        _ = Task.Run(async () =>
+        {
+            await Task.Delay(300);
+            var ivrEndpoint = _config["IvrEndpoint"] ?? "http://localhost:7071";
+            var payload = BuildCallStateNotification(callId, "terminated");
+            await PostToBotEndpointRawAsync(ivrEndpoint, payload);
+        });
+
+        return Results.Accepted(value: new { id = Guid.NewGuid().ToString(), status = "running" });
+    }
+
+    private IResult HandleReject(string callId, SimulatedCall? call)
+    {
+        call?.TransitionTo(CallState.Failed, CallEventSource.Ivr, "Graph reject");
+        return Results.Ok();
+    }
+
+    // ════════════════════════════════════════════════════════════
+    //  Notification payload builders
+    // ════════════════════════════════════════════════════════════
+
+    private static string BuildCallStateNotification(string callId, string state,
+        string? callerNumber = null, string? calledNumber = null)
+    {
+        object resourceData = callerNumber != null
+            ? new
+            {
+                @odatatype = "#microsoft.graph.call",
+                id = callId,
+                state,
+                direction = "incoming",
+                requestedModalities = new[] { "audio" },
+                mediaConfig = new { @odatatype = "#microsoft.graph.serviceHostedMediaConfig" },
+                source = new
+                {
+                    @odatatype = "#microsoft.graph.participantInfo",
+                    identity = new
+                    {
+                        @odatatype = "#microsoft.graph.identitySet",
+                        phone = new { @odatatype = "#microsoft.graph.identity", id = callerNumber }
+                    }
+                },
+                targets = new[]
+                {
+                    new
+                    {
+                        @odatatype = "#microsoft.graph.invitationParticipantInfo",
+                        identity = new
+                        {
+                            @odatatype = "#microsoft.graph.identitySet",
+                            phone = new { @odatatype = "#microsoft.graph.identity", id = calledNumber }
+                        }
+                    }
+                }
+            }
+            : (object)new
+            {
+                @odatatype = "#microsoft.graph.call",
+                id = callId,
+                state
+            };
+
+        return JsonSerializer.Serialize(new
+        {
+            @odatatype = "#microsoft.graph.commsNotifications",
+            value = new[]
+            {
+                new
+                {
+                    @odatatype   = "#microsoft.graph.commsNotification",
+                    changeType   = state == "incoming" ? "created" : "updated",
+                    resourceUrl  = $"/communications/calls/{callId}",
+                    resourceData
+                }
+            }
+        });
+    }
+
+    private static string BuildToneNotification(string callId, string graphTone)
+    {
+        return JsonSerializer.Serialize(new
+        {
+            @odatatype = "#microsoft.graph.commsNotifications",
+            value = new[]
+            {
+                new
+                {
+                    @odatatype   = "#microsoft.graph.commsNotification",
+                    changeType   = "updated",
+                    resourceUrl  = $"/communications/calls/{callId}",
+                    resourceData = new
+                    {
+                        @odatatype = "#microsoft.graph.call",
+                        id         = callId,
+                        state      = "established",
+                        toneInfo   = new
+                        {
+                            @odatatype = "#microsoft.graph.toneInfo",
+                            tone       = graphTone,
+                            sequenceId = 1
+                        }
+                    }
+                }
+            }
+        });
+    }
+
+    private static string BuildPlayPromptOperationNotification(string callId, string operationId)
+    {
+        return JsonSerializer.Serialize(new
+        {
+            @odatatype = "#microsoft.graph.commsNotifications",
+            value = new[]
+            {
+                new
+                {
+                    @odatatype   = "#microsoft.graph.commsNotification",
+                    changeType   = "updated",
+                    resourceUrl  = $"/communications/calls/{callId}/operations/{operationId}",
+                    resourceData = new
+                    {
+                        @odatatype    = "#microsoft.graph.playPromptOperation",
+                        id            = operationId,
+                        status        = "completed",
+                        clientContext = callId
+                    }
+                }
+            }
+        });
+    }
+
+    /// <summary>
+    /// Build a recordOperation completed notification.
+    /// The transcript is embedded in clientContext so the bot can inject it into
+    /// CallLog.Metadata[MetaPendingSpeech] before calling TranscriptRoutingService.
+    /// Format: "callId|transcript text"
+    /// </summary>
+    private static string BuildRecordOperationNotification(
+        string callId, string operationId, string transcript)
+    {
+        return JsonSerializer.Serialize(new
+        {
+            @odatatype = "#microsoft.graph.commsNotifications",
+            value = new[]
+            {
+                new
+                {
+                    @odatatype   = "#microsoft.graph.commsNotification",
+                    changeType   = "updated",
+                    resourceUrl  = $"/communications/calls/{callId}/operations/{operationId}",
+                    resourceData = new
+                    {
+                        @odatatype    = "#microsoft.graph.recordOperation",
+                        id            = operationId,
+                        status        = "completed",
+                        clientContext = $"{callId}|{transcript}", // simulator encodes transcript here
+                        resultInfo    = new { code = 200, subCode = 8541, message = "Stop tone received." }
+                    }
+                }
+            }
+        });
+    }
+
+    // ════════════════════════════════════════════════════════════
+    //  HTTP helpers
+    // ════════════════════════════════════════════════════════════
+
+    private async Task<bool> PostToBotEndpointAsync(
+        string ivrEndpoint, string payload, SimulatedCall call, string description)
+    {
+        try
+        {
+            var result = await PostToBotEndpointRawAsync(ivrEndpoint, payload);
+            if (result)
+                call.AddEvent(CallEventSource.Acs, $"{description} → IVR accepted");
+            else
+                call.AddEvent(CallEventSource.Acs, $"{description} → IVR rejected");
+            return result;
+        }
+        catch (Exception ex)
+        {
+            call.TransitionTo(CallState.Failed, CallEventSource.System,
+                $"Failed to reach IVR: {description}", ex.Message);
+            return false;
+        }
+    }
+
+    private async Task<bool> PostToBotEndpointRawAsync(string ivrEndpoint, string payload)
+    {
+        var client = _httpClientFactory.CreateClient();
+        // Teams sends these without auth in the simulator (no JWT validation in dev)
+        var content = new StringContent(payload, Encoding.UTF8, "application/json");
+        var response = await client.PostAsync($"{ivrEndpoint}/api/bot-messages", content);
+        _logger.LogDebug("Bot endpoint response: HTTP {Status}", (int)response.StatusCode);
+        return response.IsSuccessStatusCode;
+    }
+
+    // ════════════════════════════════════════════════════════════
+    //  Utilities
+    // ════════════════════════════════════════════════════════════
+
+    private static string? ExtractCallId(string path)
+    {
+        // communications/calls/{callId}[/action]
+        var parts = path.TrimStart('/').Split('/');
+        var idx   = Array.IndexOf(parts, "calls");
+        return idx >= 0 && idx + 1 < parts.Length ? parts[idx + 1] : null;
+    }
+
+    private static string MapDigitToGraphTone(string digit) => digit switch
+    {
+        "0" => "tone0",
+        "1" => "tone1",
+        "2" => "tone2",
+        "3" => "tone3",
+        "4" => "tone4",
+        "5" => "tone5",
+        "6" => "tone6",
+        "7" => "tone7",
+        "8" => "tone8",
+        "9" => "tone9",
+        "#" => "pound",
+        "*" => "star",
+        _   => digit.ToLowerInvariant()
+    };
+}

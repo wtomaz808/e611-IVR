@@ -12,11 +12,19 @@ builder.Services.AddSingleton<CallStateManager>();
 builder.Services.AddSingleton<PstnService>();
 builder.Services.AddSingleton<Cm10Service>();
 
-// ACS Bridge — Mock or Live based on configuration
+// ACS / Teams Bridge — selected by AcsMode configuration:
+//   Mock       → Legacy ACS mock bridge (EventGrid + ACS callback format)
+//   TeamsBot   → Teams calling bot mock bridge (commsNotifications + Graph API)
+//   Live       → Real ACS (LiveAcsBridge)
 var acsMode = builder.Configuration["AcsMode"] ?? "Mock";
+
 if (acsMode.Equals("Live", StringComparison.OrdinalIgnoreCase))
 {
     builder.Services.AddSingleton<IAcsBridge, LiveAcsBridge>();
+}
+else if (acsMode.Equals("TeamsBot", StringComparison.OrdinalIgnoreCase))
+{
+    builder.Services.AddSingleton<IAcsBridge, MockTeamsBridge>();
 }
 else
 {
@@ -28,17 +36,14 @@ var app = builder.Build();
 app.UseStaticFiles();
 app.UseRouting();
 
-// ─── Mock ACS Call Automation REST API ──────────────────────
-// These endpoints mimic the ACS REST API so the IVR Functions
-// can connect to the simulator instead of real Azure.
-// The IVR sets: ACS_CONNECTION_STRING=endpoint=http://pstn-simulator:8080;accesskey=bW9ja2tleQ==
+// ─── Mock ACS Call Automation REST API (legacy mode) ────────
+// Active when AcsMode=Mock. Mimics ACS REST API so IVR Functions
+// can use: AcsConnectionString=endpoint=http://pstn-simulator:8080;accesskey=bW9ja2tleQ==
 if (acsMode.Equals("Mock", StringComparison.OrdinalIgnoreCase))
 {
-    // Resolve the mock bridge once at startup
     var mockBridge = app.Services.GetRequiredService<IAcsBridge>() as MockAcsBridge;
     if (mockBridge != null)
     {
-        // Catch-all route for /calling/* paths (ACS uses colons in paths like :answer, :play)
         app.Map("/calling/{**path}", async (HttpContext ctx, string path) =>
         {
             return await mockBridge.HandleAcsApiAsync(ctx, path);
@@ -46,9 +51,41 @@ if (acsMode.Equals("Mock", StringComparison.OrdinalIgnoreCase))
     }
 }
 
+// ─── Mock Microsoft Graph Calling API (Teams bot mode) ──────
+// Active when AcsMode=TeamsBot.
+// The IVR Functions are configured with:
+//   GraphApiEndpoint = http://pstn-simulator:8080/graph/v1.0
+//   MicrosoftAppId   = simulator (no real auth needed in local dev)
+// Intercepts Graph call control commands and fires follow-up
+// commsNotifications back to the bot endpoint.
+if (acsMode.Equals("TeamsBot", StringComparison.OrdinalIgnoreCase))
+{
+    var teamsBridge = app.Services.GetRequiredService<IAcsBridge>() as MockTeamsBridge;
+    if (teamsBridge != null)
+    {
+        // Token endpoint — return a mock token so GraphServiceClient doesn't fail auth
+        app.MapPost("/graph/v1.0/oauth2/token", () => Results.Ok(new
+        {
+            access_token = "mock-simulator-token",
+            token_type   = "Bearer",
+            expires_in   = 3600
+        }));
+        app.MapPost("/graph/v1.0/common/oauth2/v2.0/token", () => Results.Ok(new
+        {
+            access_token = "mock-simulator-token",
+            token_type   = "Bearer",
+            expires_in   = 3600
+        }));
+
+        // All Graph Calling API routes: /graph/v1.0/communications/calls/...
+        app.Map("/graph/v1.0/{**path}", async (HttpContext ctx, string path) =>
+        {
+            return await teamsBridge.HandleGraphApiAsync(ctx, path);
+        });
+    }
+}
+
 // ─── Mock External API ─────────────────────────────────────
-// Simulates the external client system that receives IVR-collected data
-// (property, inspection type, caller role, etc.) for work order creation.
 app.MapPost("/api/external/work-order", async (HttpContext ctx) =>
 {
     using var reader = new StreamReader(ctx.Request.Body);
@@ -63,7 +100,6 @@ app.MapPost("/api/external/work-order", async (HttpContext ctx) =>
     logger.LogInformation("{Body}", body);
     logger.LogInformation("═══════════════════════════════════════════════════");
 
-    // Return a mock work order confirmation
     var workOrderId = $"WO-{DateTime.UtcNow:yyyyMMdd}-{Random.Shared.Next(1000, 9999)}";
     return Results.Ok(new
     {

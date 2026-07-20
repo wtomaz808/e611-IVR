@@ -222,6 +222,37 @@ try
     totalErrors += teamErrors;
 
     // ========================================
+    // SEED PHONE NUMBER CONFIGS (Teams DIDs)
+    // ========================================
+    var phoneNumbers = PhoneNumberSeeder.GeneratePhoneNumberConfigs();
+    Console.WriteLine($"📱 SEEDING PHONE NUMBER CONFIGS ({phoneNumbers.Count} total)");
+    Console.WriteLine("─────────────────────────────────────────────────────────");
+
+    int phoneSuccess = 0;
+    int phoneErrors = 0;
+
+    foreach (var pn in phoneNumbers)
+    {
+        try
+        {
+            await cosmosService.UpsertPhoneNumberConfigAsync(pn);
+            Console.WriteLine($"  ✅ {pn.PhoneNumber} - {pn.Label} ({pn.NumberType})");
+            phoneSuccess++;
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"  ❌ {pn.PhoneNumber}: {ex.Message}");
+            phoneErrors++;
+        }
+    }
+
+    Console.WriteLine($"  📊 Phone Numbers: {phoneSuccess} succeeded, {phoneErrors} failed");
+    Console.WriteLine();
+
+    totalSuccess += phoneSuccess;
+    totalErrors += phoneErrors;
+
+    // ========================================
     // SUMMARY
     // ========================================
     Console.WriteLine("═══════════════════════════════════════════════════════════");
@@ -237,6 +268,7 @@ try
     Console.WriteLine($"   ALI Records:    {aliSuccess}/{aliRecords.Count}");
     Console.WriteLine($"   Menus:          {menuSuccess}/{menus.Count}");
     Console.WriteLine($"   Team Routing:   {teamSuccess}/{teamConfigs.Count}");
+    Console.WriteLine($"   Phone Numbers:  {phoneSuccess}/{phoneNumbers.Count}");
     Console.WriteLine("═══════════════════════════════════════════════════════════");
     Console.WriteLine();
     Console.WriteLine("📋 Next steps:");

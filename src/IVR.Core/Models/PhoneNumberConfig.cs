@@ -15,7 +15,14 @@ public enum PstnNumberType
     DirectRouting,
 
     /// <summary>Phone number routed via SIP trunk provider (e.g., Twilio Elastic SIP, Bandwidth).</summary>
-    SipTrunk
+    SipTrunk,
+
+    /// <summary>
+    /// Phone number assigned to a Microsoft Teams Resource Account.
+    /// Calls arrive via Teams Phone System (Calling Plans or Operator Connect) and are
+    /// delivered to the IVR as Graph commsNotifications to the Teams Calling Bot.
+    /// </summary>
+    TeamsBot
 }
 
 /// <summary>
