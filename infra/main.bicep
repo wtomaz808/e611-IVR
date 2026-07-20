@@ -76,15 +76,16 @@ module cognitiveServices 'modules/cognitive-services.bicep' = {
 }
 
 // ─── Azure OpenAI (Transcript Intent Classification) ────────────
-// Using gpt-4.1 model (version 2025-04-14) available in Azure Government
+// Using gpt-4.5 (2025-02-27) — newest GPT chat model available in Azure Government.
+// Verify availability at: https://learn.microsoft.com/en-us/azure/ai-services/openai/concepts/models
 module openAI 'modules/openai.bicep' = {
   params: {
     name: '${namePrefix}-openai-${uniqueSuffix}'
     location: location
     tags: tags
-    deploymentName: 'gpt-41'
-    modelName: 'gpt-4.1'
-    modelVersion: '2025-04-14'
+    deploymentName: 'gpt-45'
+    modelName: 'gpt-4.5'
+    modelVersion: '2025-02-27'
   }
 }
 

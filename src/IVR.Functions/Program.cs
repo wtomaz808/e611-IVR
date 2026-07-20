@@ -142,6 +142,7 @@ var host = new HostBuilder()
         services.AddSingleton<ICallFlowEngine, CallFlowEngine>();
         services.AddSingleton<AniAliService>();
         services.AddSingleton<PromptService>();
+        services.AddSingleton<TtsGenerationService>();
         services.AddSingleton<TranscriptRoutingService>();
 
         // HTTP client factory for external system integrations
@@ -149,6 +150,11 @@ var host = new HostBuilder()
         {
             client.DefaultRequestHeaders.Add("Accept", "application/json");
             client.Timeout = TimeSpan.FromSeconds(30);
+        });
+        // HTTP client for TTS audio generation via Cognitive Services REST API
+        services.AddHttpClient("TtsService", client =>
+        {
+            client.Timeout = TimeSpan.FromSeconds(15);
         });
         services.AddSingleton<ExternalSystemIntegrationService>();
 
