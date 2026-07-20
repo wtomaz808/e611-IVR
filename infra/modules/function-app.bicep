@@ -70,7 +70,8 @@ resource hostingPlan 'Microsoft.Web/serverfarms@2023-12-01' = {
     tier: 'Dynamic'
   }
   properties: {
-    reserved: true // Linux
+    // reserved: false = Windows (Dynamic Linux not available in all Azure Gov regions)
+    reserved: false
   }
 }
 
@@ -78,12 +79,12 @@ resource functionApp 'Microsoft.Web/sites@2023-12-01' = {
   name: name
   location: location
   tags: tags
-  kind: 'functionapp,linux'
+  kind: 'functionapp'
   properties: {
     serverFarmId: hostingPlan.id
     httpsOnly: true
     siteConfig: {
-      linuxFxVersion: 'DOTNET-ISOLATED|8.0'
+      netFrameworkVersion: 'v8.0'
       appSettings: [
         { name: 'AzureWebJobsStorage', value: 'DefaultEndpointsProtocol=https;AccountName=${storageAccountName};AccountKey=${storageAccountKey};EndpointSuffix=${environment().suffixes.storage}' }
         { name: 'FUNCTIONS_EXTENSION_VERSION', value: '~4' }
