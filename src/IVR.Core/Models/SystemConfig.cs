@@ -15,7 +15,14 @@ public enum PstnMode
     DirectRouting,
 
     /// <summary>Mix of ACS-native and direct-routed numbers.</summary>
-    Hybrid
+    Hybrid,
+
+    /// <summary>
+    /// PSTN calls arrive via Microsoft Teams Phone System (Calling Plans or Operator Connect).
+    /// The IVR engine is driven by a Teams Calling Bot using the Microsoft Graph Calling API.
+    /// No customer-managed SBC or Azure Communication Services required.
+    /// </summary>
+    TeamsBot
 }
 
 /// <summary>
@@ -109,6 +116,46 @@ public class SystemConfig
     /// </summary>
     [JsonPropertyName("cm10TransferPromptId")]
     public string? Cm10TransferPromptId { get; set; }
+
+    // ─── Teams Integration ──────────────────────────────
+
+    /// <summary>
+    /// The Entra App Registration Application (client) ID used by the Teams Calling Bot.
+    /// Non-sensitive — this is the public identifier, not the secret.
+    /// Displayed in the admin portal for operator reference.
+    /// </summary>
+    [JsonPropertyName("teamsBotAppId")]
+    public string? TeamsBotAppId { get; set; }
+
+    /// <summary>
+    /// The Entra tenant ID that owns the bot App Registration.
+    /// </summary>
+    [JsonPropertyName("teamsTenantId")]
+    public string? TeamsTenantId { get; set; }
+
+    /// <summary>
+    /// Full HTTPS URL of the bot messaging endpoint that Teams sends call events to.
+    /// Format: https://&lt;functionapp&gt;.azurewebsites.us/api/bot-messages
+    /// Used for reference and for registering in Teams Admin Center.
+    /// </summary>
+    [JsonPropertyName("teamsBotMessagingEndpoint")]
+    public string? TeamsBotMessagingEndpoint { get; set; }
+
+    /// <summary>
+    /// Describes how PSTN numbers are provisioned in Teams Phone System.
+    /// CallingPlan — Microsoft provides numbers; no carrier/SBC needed.
+    /// OperatorConnect — Carrier connects directly to Teams; carrier manages SBC.
+    /// DirectRouting — Customer-managed SBC with Teams Direct Routing.
+    /// </summary>
+    [JsonPropertyName("teamsPhoneSystemMode")]
+    public string TeamsPhoneSystemMode { get; set; } = "CallingPlan";
+
+    /// <summary>
+    /// Azure Bot Service resource name (e.g. ivr-dev-bot-xxxx).
+    /// Informational — used when registering the bot in Teams Admin Center.
+    /// </summary>
+    [JsonPropertyName("teamsBotServiceName")]
+    public string? TeamsBotServiceName { get; set; }
 
     [JsonPropertyName("partitionKey")]
     public string PartitionKey => "config";
