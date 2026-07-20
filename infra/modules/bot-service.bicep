@@ -12,7 +12,8 @@
 @description('Bot Service resource name')
 param name string
 
-@description('Azure region')
+@description('Azure region for other resources in the deployment (Bot Service itself is always global)')
+#disable-next-line no-unused-params
 param location string
 
 @description('Resource tags')
@@ -38,7 +39,7 @@ param botDescription string = 'E911 IVR Teams Calling Bot — routes and manages
 // support telephony or real-time media bots.
 resource botService 'Microsoft.BotService/botServices@2022-09-15' = {
   name: name
-  location: location
+  location: 'global' // Microsoft.BotService is a global resource — region param is ignored
   tags: tags
   sku: {
     name: 'S1'
@@ -68,7 +69,7 @@ resource botService 'Microsoft.BotService/botServices@2022-09-15' = {
 resource teamsChannel 'Microsoft.BotService/botServices/channels@2022-09-15' = {
   parent: botService
   name: 'MsTeamsChannel'
-  location: location
+  location: 'global'
   properties: {
     channelName: 'MsTeamsChannel'
     properties: {
