@@ -1,395 +1,195 @@
-# Starting the E911 IVR System Locally
-
-This guide provides step-by-step instructions to launch all containers needed to run the E911 IVR solution locally.
-
-## Prerequisites
-
-- **Docker Desktop** installed and running on Windows
-- **Git** (to clone/access the repository)
-- **.env file** configured with required environment variables
-
-## Quick Start
-
-To start all services with a single command:
-
-```powershell
-docker compose up --build -d
-```
-
-This command will:
-- Build all container images
-- Start all services in detached mode (background)
-- Create the necessary Docker network
-
-## System Components
-
-The local environment consists of four main containers:
-
-| Container | Service | Port | Description |
-|-----------|---------|------|-------------|
-| `ivr-functions` | Azure Functions | 7071 | Main IVR call handling logic |
-| `ivr-admin` | Admin Portal | 8080 | Blazor-based administration interface |
-| `pstn-simulator` | PSTN Simulator | 5200 | Mock PSTN/ACS for testing calls |
-| `azurite` | Storage Emulator | 10000-10002 | Local Azure Storage emulator |
-
-## Detailed Steps
-
-### 1. Configure Environment Variables
-
-Before starting the containers, ensure you have a `.env` file in the root directory:
-
-```powershell
-# Copy the example file if you haven't already
-cp .env.example .env
-```
-
-Edit `.env` and configure the required variables:
-
-```bash
-# Minimal configuration for local development
-AZURE_WEBJOBS_STORAGE=UseDevelopmentStorage=true;DevelopmentStorageProxyUri=http://azurite
-CALLBACK_BASE_URL=http://localhost:7071
-ASPNETCORE_ENVIRONMENT=Development
-
-# Optional: Add Azure service credentials if needed
-# ACS_CONNECTION_STRING=endpoint=https://...
-# COSMOS_DB_CONNECTION_STRING=AccountEndpoint=...
-# AZURE_OPENAI_ENDPOINT=https://...
-```
-
-### 2. Build and Start All Containers
-
-From the repository root directory:
-
-```powershell
-# Navigate to the project root
-cd c:\DSOP\repos3\IVR\e911-ivr
-
-# Build and start all containers
-docker compose up --build -d
-```
-
-The `--build` flag ensures images are rebuilt with the latest code changes.
-The `-d` flag runs containers in detached mode (background).
-
-### 3. Verify Container Status
-
-Check that all containers are running:
-
-```powershell
-docker compose ps
-```
-
-You should see all four containers with status "Up":
-- `ivr-functions`
-- `ivr-admin`
-- `pstn-simulator`
-- `azurite`
-
-### 4. Access the Services
-
-Once all containers are running, you can access:
-
-- **Admin Portal**: http://localhost:8080
-- **PSTN Simulator**: http://localhost:5200
-- **IVR Functions**: http://localhost:7071
-- **Azurite Blob Storage**: http://localhost:10000
-- **Azurite Queue Storage**: http://localhost:10001
-- **Azurite Table Storage**: http://localhost:10002
-
-### 5. View Container Logs
-
-To monitor logs from all containers:
-
-```powershell
-docker compose logs -f
-```
-
-To view logs from a specific service:
-
-```powershell
-docker compose logs -f ivr-functions
-docker compose logs -f ivr-admin
-docker compose logs -f pstn-simulator
-docker compose logs -f azurite
-```
-
-Press `Ctrl+C` to stop tailing logs.
-
-## Stopping the System
-
-### Stop All Containers
-
-```powershell
-docker compose stop
-```
-
-This stops all containers but preserves their state.
-
-### Stop and Remove Containers
-
-```powershell
-docker compose down
-```
-
-This stops and removes containers, networks, but keeps volumes.
-
-### Complete Cleanup
-
-```powershell
-# Remove containers, networks, and volumes
-docker compose down -v
-
-# Remove built images as well
-docker compose down -v --rmi all
-```
-
-## Restarting the System
-
-### Restart Without Rebuilding
-
-If no code changes were made:
-
-```powershell
-docker compose up -d
-```
-
-### Restart with Rebuild
-
-After making code changes:
-
-```powershell
-docker compose up --build -d
-```
-
-### Restart a Single Service
-
-```powershell
-# Stop and remove a specific container
-docker compose stop ivr-functions
-docker compose rm -f ivr-functions
-
-# Rebuild and restart it
-docker compose up --build -d ivr-functions
-```
-
-## Updating from Main Branch
-
-When updates are available on the main branch, follow these steps to update your local environment and Azure deployments:
-
-### 1. Pull Latest Changes
-
-```powershell
-# Stash any current work
-git stash push -m "WIP: Before updating from main"
-
-# Fetch and merge latest from main
-git fetch origin
-git merge origin/main -m "Merge main updates"
-
-# Re-apply your stashed changes
-git stash pop
-```
-
-### 2. Update Local Containers
-
-After merging updates, rebuild affected containers:
-
-```powershell
-# Rebuild all containers with latest code
-docker compose up --build -d
-
-# Or rebuild specific containers only
-docker compose up --build -d pstn-simulator ivr-admin
-```
-
-### 3. Deploy to Azure (If Applicable)
-
-If you need to deploy the updates to Azure Government:
-
-**Deploy Function App:**
-```powershell
-cd src/IVR.Functions
-dotnet publish -c Release -o ./publish
-cd publish
-Compress-Archive -Path * -DestinationPath ../deploy.zip -Force
-cd ..
-az functionapp deployment source config-zip `
-  --resource-group rg-ivr-dev `
-  --name ivr-dev-func-4c5ax3aimbdsy `
-  --src deploy.zip
-```
-
-**Deploy Admin Portal:**
-```powershell
-cd src/IVR.AdminPortal
-dotnet publish -c Release -o ./publish
-cd publish
-Compress-Archive -Path * -DestinationPath ../deploy.zip -Force
-cd ..
-az webapp deployment source config-zip `
-  --resource-group rg-ivr-dev `
-  --name ivr-dev-admin-4c5ax3aimbdsy `
-  --src deploy.zip
-```
-
-> **Note**: Ensure you're connected to Azure Government cloud before deploying:
-> ```powershell
-> az cloud set --name AzureUSGovernment
-> az login --tenant d14ab12e-c535-4865-a593-c4115e7de102
-> ```
-
-### 4. Verify Updates
-
-After updating:
-
-```powershell
-# Check container status
-docker compose ps
-
-# View logs for any errors
-docker compose logs -f
-
-# Test endpoints
-# Admin Portal: http://localhost:8080
-# PSTN Simulator: http://localhost:5200
-# Functions: http://localhost:7071
-```
-
-## Troubleshooting
-
-### Port Conflicts
-
-If you see port binding errors, ensure the required ports are not in use:
-
-```powershell
-# Check if ports are already in use
-netstat -ano | findstr ":7071"
-netstat -ano | findstr ":8080"
-netstat -ano | findstr ":5200"
-netstat -ano | findstr ":10000"
-```
-
-### Container Build Failures
-
-If a container fails to build:
-
-1. Check the build logs:
-   ```powershell
-   docker compose build --no-cache ivr-functions
-   ```
-
-2. Verify Docker has enough resources (CPU, Memory, Disk)
-
-3. Clean up Docker system:
-   ```powershell
-   docker system prune -a
-   ```
-
-### Connection Issues Between Containers
-
-Containers communicate via the `ivr-network` Docker network. Verify it exists:
-
-```powershell
-docker network ls | findstr ivr-network
-```
-
-### Azurite Storage Not Accessible
-
-If functions can't connect to Azurite, ensure:
-- Azurite container is running and healthy
-- `AZURE_WEBJOBS_STORAGE` points to the correct proxy URI
-- The `azurite` service started before the functions container
-
-## Development Workflow
-
-### Typical Development Cycle
-
-1. Make code changes in your IDE
-2. Rebuild specific container(s):
-   ```powershell
-   docker compose up --build -d ivr-functions
-   ```
-3. Test via Admin Portal or PSTN Simulator
-4. View logs to debug issues:
-   ```powershell
-   docker compose logs -f ivr-functions
-   ```
-
-### Working with the PSTN Simulator
-
-The PSTN Simulator provides a mock ACS environment for testing calls without Azure resources:
-
-1. Navigate to http://localhost:5200
-2. Configure a test call scenario
-3. Initiate calls to test IVR flow
-4. Monitor events and responses in real-time
-
-### Working with the Admin Portal
-
-The Admin Portal allows you to:
-
-- Manage call flows and prompts
-- Configure ANI/ALI mappings
-- View call logs and analytics
-- Configure Teams integration
-- Manage system settings
-
-Access it at http://localhost:8080
-
-## Network Architecture
-
-```
-┌─────────────────────────────────────────────────┐
-│ Docker Network: ivr-network                     │
-│                                                 │
-│  ┌──────────────┐      ┌──────────────┐        │
-│  │ ivr-admin    │      │ ivr-functions│        │
-│  │ :8080        │      │ :80 (7071)   │        │
-│  └──────┬───────┘      └──────┬───────┘        │
-│         │                     │                 │
-│         │    ┌────────────────┤                 │
-│         │    │                │                 │
-│  ┌──────┴────┴───┐     ┌──────┴───────┐        │
-│  │ pstn-simulator│     │   azurite    │        │
-│  │ :8080 (5200)  │     │ :10000-10002 │        │
-│  └───────────────┘     └──────────────┘        │
-│                                                 │
-└─────────────────────────────────────────────────┘
-         │                     │
-    Host :5200            Host :7071
-    Host :8080            Host :10000-10002
-```
-
-## Additional Resources
-
-- [Architecture Documentation](./docs/architecture.md)
-- [Function App Details](./docs/function-app.md)
-- [Admin Portal Guide](./docs/admin-portal.md)
-- [PSTN Simulator Guide](./docs/pstn-simulator.md)
-- [System Integration](./docs/system-integration.md)
-
-## Environment Variables Reference
-
-See [.env.example](./.env.example) for a complete list of available environment variables and their descriptions.
-
-### Required for Local Development
-
-- `AZURE_WEBJOBS_STORAGE` - Storage connection for Functions runtime
-- `ASPNETCORE_ENVIRONMENT` - ASP.NET environment (Development/Production)
-
-### Optional for Full Functionality
-
-- `ACS_CONNECTION_STRING` - Azure Communication Services
-- `COSMOS_DB_CONNECTION_STRING` - Cosmos DB for state storage
-- `STORAGE_CONNECTION_STRING` - Azure Storage for media files
-- `COGNITIVE_SERVICES_ENDPOINT` - Speech services
-- `AZURE_OPENAI_ENDPOINT` - GPT integration
-- `AZURE_AD_TENANT_ID` - Admin portal authentication
-- `APPINSIGHTS_CONNECTION_STRING` - Telemetry and monitoring
+# E911 IVR — Local Demo Guide (Teams Bot Mode)
+
+This guide covers how to run a full end-to-end demo of the Teams-integrated IVR
+**without needing access to a real Microsoft Teams tenant**. The PSTN Simulator
+replaces Teams Phone System and the Microsoft Graph Calling API, letting you drive
+calls, press DTMF keys, and speak phrases entirely from a browser.
 
 ---
 
-**Last Updated**: March 4, 2026  
-**System Version**: 1.0  
-**Docker Compose Version**: 3.8
+## Architecture in Demo Mode
+
+```
+Your Browser
+  |
+  +--> PSTN Simulator (localhost:5200)   <-- you click "Make Call" here
+         |
+         | commsNotifications JSON
+         v
+  IVR Functions (localhost:7071)  /api/bot-messages
+         |
+         | Graph API calls  -->  PSTN Simulator (localhost:5200) /graph/v1.0/*
+         |                       (simulator responds + fires follow-up events)
+         v
+  Admin Portal (localhost:8080)   <-- you watch call logs, menus, ANI/ALI here
+```
+
+---
+
+## Prerequisites
+
+- Docker Desktop running
+- Repository cloned and on the `teams_integration` branch
+- (Optional) Real Cosmos DB + Azure OpenAI connection strings for full demo
+  - Without them the system uses **in-memory seeded data** — menus, ANI/ALI,
+    and team routing all work; call logs are ephemeral
+
+---
+
+## Quick Start (Full Teams Demo)
+
+### Step 1 — Configure `.env`
+
+Copy the example and fill in the optional Azure service strings:
+
+```powershell
+cd c:\DSOP\repos3\IVR\e911-ivr
+Copy-Item .env.example .env   # if not already done
+```
+
+Minimum `.env` for a fully-offline demo (all in-memory, no Azure needed):
+```env
+# Teams Bot (simulator credentials — no real auth in local mode)
+TEAMS_BOT_APP_ID=simulator
+TEAMS_BOT_APP_PASSWORD=simulator
+TEAMS_BOT_TENANT_ID=simulator
+
+# Graph API routes to the simulator (not real Azure Graph)
+GRAPH_API_ENDPOINT=http://pstn-simulator:8080/graph/v1.0
+
+# Simulator mode
+ACS_MODE=TeamsBot
+```
+
+For a richer demo with real Cosmos DB, AI routing, and TTS:
+```env
+COSMOS_DB_CONNECTION_STRING=AccountEndpoint=https://...
+COGNITIVE_SERVICES_ENDPOINT=https://ivr-teams-speech-xxx.cognitiveservices.azure.us/
+COGNITIVE_SERVICES_KEY=...
+AZURE_OPENAI_ENDPOINT=https://ivr-teams-openai-xxx.openai.azure.us/
+AZURE_OPENAI_API_KEY=...
+AZURE_OPENAI_DEPLOYMENT=gpt-45
+STORAGE_CONNECTION_STRING=DefaultEndpointsProtocol=https;...
+```
+
+### Step 2 — Build and Start All Containers
+
+```powershell
+docker compose up --build -d
+```
+
+Verify all four containers are running:
+```powershell
+docker compose ps
+```
+
+| Container | URL | What it does |
+|---|---|---|
+| `ivr-functions` | http://localhost:7071 | IVR engine / Teams calling bot |
+| `ivr-admin` | http://localhost:8080 | Admin portal (watch this during demo) |
+| `pstn-simulator` | http://localhost:5200 | Drives the simulated call |
+| `azurite` | localhost:10000-10002 | Local storage emulator |
+
+### Step 3 — Open Two Tabs
+
+- **Tab 1**: http://localhost:5200 — PSTN Simulator (your "phone")
+- **Tab 2**: http://localhost:8080 — Admin Portal (observe live call state)
+
+---
+
+## Demo Walkthrough — Step by Step
+
+### Scene 1: Basic DTMF Call Flow
+
+**Goal:** Show a caller dialing in, navigating the E911 menu with keypad presses,
+and the call log being recorded.
+
+1. In the **Simulator** (Tab 1), click **New Call**
+2. Select a caller from the pre-loaded ANI records (e.g., "John Smith - VIP")
+3. Select DID `+17035550911` (E911 Main Line)
+4. Click **Place Call**
+   - Simulator sends `commsNotification (incoming)` to the IVR
+   - IVR answers via mock Graph API
+   - Welcome prompt plays (IVR sends `playPrompt` → simulator fires `playPromptOperation`)
+5. In the **Simulator**, click **DTMF: 1** (Emergency — Transfer to RDC Dispatcher)
+   - IVR receives the tone, navigates to the emergency transfer action
+   - Call transitions to "Transferred"
+6. In the **Admin Portal** (Tab 2), click **Call Logs**
+   - Find the call — it shows caller number, ANI data (John Smith), menu path taken, disposition
+
+### Scene 2: Speech / AI Routing
+
+**Goal:** Show AI-powered natural language routing.
+
+1. Place a new call from the Simulator
+2. Select a speech-routing DID or wait for the main menu to reach a speech prompt
+3. Click **Speak** in the Simulator and type: `"There is a fire in Building 7"`
+4. The IVR:
+   - Sends the transcript to Azure OpenAI (or returns a seeded match in offline mode)
+   - Classifies intent: "Fire Dispatcher" at high confidence
+   - Plays: "I'll connect you with our Fire Dispatch team now"
+   - Transfers the call
+5. Call Log shows:
+   - `transcript: "There is a fire in Building 7"`
+   - `detectedIntent: "Fire Dispatcher"`
+   - `intentConfidence: 0.94`
+
+### Scene 3: ANI/ALI Demo
+
+**Goal:** Show caller identification and location data.
+
+1. In the **Admin Portal**, go to **ANI/ALI** and show the pre-seeded caller records
+2. Place a call from the Simulator using a VIP caller
+3. In the Call Logs, show how the IVR auto-identified the caller name, location, and VIP status
+
+### Scene 4: Menu Management
+
+**Goal:** Show the admin portal's menu builder.
+
+1. In the **Admin Portal**, click **Call Flows**
+2. Show the E911 Main Menu tree with all 4 options
+3. Demonstrate editing a menu option label or DTMF key
+4. Save — the change takes effect on the next call immediately (no redeploy)
+
+---
+
+## Switching to Real Teams (When Customer Tenant is Available)
+
+When you have access to the customer's Teams tenant, update `.env`:
+
+```env
+# Real Teams bot credentials (from Create-BotAppRegistration.ps1 output)
+TEAMS_BOT_APP_ID=251948e8-7012-4fc4-a6b6-59e82c9dd983
+TEAMS_BOT_APP_PASSWORD=<real-secret>
+TEAMS_BOT_TENANT_ID=5af05be5-b9df-43d4-8897-ec17d3118935
+
+# Real Azure Government Graph API (not the simulator)
+GRAPH_API_ENDPOINT=https://graph.microsoft.us/v1.0
+TEAMS_CHANNEL_SERVICE=https://botframework.azure.us
+
+# Switch simulator to not intercept Graph calls
+ACS_MODE=Mock   # or remove it entirely once real Teams is live
+```
+
+Then run:
+```powershell
+docker compose up --build -d
+```
+
+---
+
+## Troubleshooting
+
+| Symptom | Check |
+|---|---|
+| Simulator shows "IVR rejected event" | IVR Functions not running — check `docker compose ps` |
+| Call stuck at "incoming", never "established" | GraphApiEndpoint not pointing to simulator — check `.env` |
+| No menu plays (silent after answer) | TTS service not configured — prompts need audio URL or Cognitive Services key |
+| AI routing returns "no match" | OpenAI not configured — falls back to DTMF routing |
+| Admin Portal blank / no data | Cosmos DB not connected — running in in-memory mode, data is seeded but ephemeral |
+
+```powershell
+# View live logs for any container
+docker compose logs -f ivr-functions
+docker compose logs -f pstn-simulator
+```
