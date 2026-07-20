@@ -10,19 +10,23 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="Azure.Communication.CallAutomation" Version="1.2.0" />
-    <PackageReference Include="Azure.Communication.Common" Version="1.3.0" />
-    <PackageReference Include="Azure.Messaging.EventGrid" Version="4.21.0" />
+    <!-- ── Teams Calling Bot ─────────────────────────────────────── -->
+    <!-- Replaces Azure.Communication.CallAutomation + Azure.Communication.Common -->
+    <PackageReference Include="Microsoft.Bot.Builder" Version="4.23.1" />
+    <PackageReference Include="Microsoft.Bot.Builder.Integration.AspNet.Core" Version="4.23.1" />
+    <!-- Microsoft Graph SDK v6 — call control commands (answer, play, transfer, hangup) -->
+    <PackageReference Include="Microsoft.Graph" Version="6.2.0" />
+    <!-- ── Azure Functions runtime ───────────────────────────────── -->
     <PackageReference Include="Microsoft.Azure.Cosmos" Version="3.37.1" />
     <PackageReference Include="Microsoft.Azure.Functions.Worker" Version="1.22.0" />
     <PackageReference Include="Microsoft.Azure.Functions.Worker.Extensions.Http" Version="3.2.0" />
     <PackageReference Include="Microsoft.Azure.Functions.Worker.Extensions.Http.AspNetCore" Version="1.3.2" />
-    <PackageReference Include="Microsoft.Azure.Functions.Worker.Extensions.EventGrid" Version="3.4.1" />
     <PackageReference Include="Microsoft.Azure.Functions.Worker.Sdk" Version="1.17.4" />
     <PackageReference Include="Microsoft.ApplicationInsights.WorkerService" Version="2.22.0" />
     <PackageReference Include="Microsoft.Azure.Functions.Worker.ApplicationInsights" Version="1.2.0" />
+    <!-- ── Shared services (unchanged) ──────────────────────────── -->
     <PackageReference Include="Azure.Storage.Blobs" Version="12.19.1" />
-    <PackageReference Include="Azure.Identity" Version="1.10.4" />
+    <PackageReference Include="Azure.Identity" Version="1.13.2" />
     <PackageReference Include="Azure.AI.OpenAI" Version="2.1.0" />
   </ItemGroup>
 
