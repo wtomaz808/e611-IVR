@@ -25,9 +25,15 @@ param appInsightsConnectionString string
 @description('Cosmos DB connection string')
 param cosmosDbConnectionString string
 
+@description('Entra App Registration client ID for the Teams Calling Bot')
+param botAppId string
+
 @secure()
-@description('Azure Communication Services connection string')
-param acsConnectionString string
+@description('Entra App Registration client secret for the Teams Calling Bot')
+param botAppPassword string
+
+@description('Entra tenant ID that owns the bot App Registration')
+param botTenantId string
 
 @description('Cognitive Services endpoint')
 param cognitiveServicesEndpoint string
@@ -45,6 +51,15 @@ param openAIKey string
 
 @description('Azure OpenAI deployment name')
 param openAIDeploymentName string
+
+// ─── Cloud-specific Bot Framework endpoints ─────────────────────
+// Azure Government (GCC High) uses separate auth and channel service
+// endpoints. These are automatically selected based on the deployment
+// environment.
+var isGovCloud = environment().name == 'AzureUSGovernment'
+var channelService = isGovCloud ? 'https://botframework.azure.us' : ''
+var oAuthUrl = isGovCloud ? 'https://login.microsoftonline.us' : environment().authentication.loginEndpoint
+var graphApiEndpoint = isGovCloud ? 'https://graph.microsoft.us/v1.0' : 'https://graph.microsoft.com/v1.0'
 
 resource hostingPlan 'Microsoft.Web/serverfarms@2023-12-01' = {
   name: '${name}-plan'
@@ -75,14 +90,22 @@ resource functionApp 'Microsoft.Web/sites@2023-12-01' = {
         { name: 'FUNCTIONS_WORKER_RUNTIME', value: 'dotnet-isolated' }
         { name: 'APPLICATIONINSIGHTS_CONNECTION_STRING', value: appInsightsConnectionString }
         { name: 'CosmosDbConnectionString', value: cosmosDbConnectionString }
-        { name: 'AcsConnectionString', value: acsConnectionString }
         { name: 'StorageConnectionString', value: 'DefaultEndpointsProtocol=https;AccountName=${storageAccountName};AccountKey=${storageAccountKey};EndpointSuffix=${environment().suffixes.storage}' }
         { name: 'CognitiveServicesEndpoint', value: cognitiveServicesEndpoint }
         { name: 'CognitiveServicesKey', value: cognitiveServicesKey }
         { name: 'AzureOpenAI__Endpoint', value: openAIEndpoint }
         { name: 'AzureOpenAI__ApiKey', value: openAIKey }
         { name: 'AzureOpenAI__DeploymentName', value: openAIDeploymentName }
-        { name: 'CallbackBaseUrl', value: 'https://${name}.azurewebsites.net' }
+        // ── Teams Calling Bot (Bot Framework) ──────────────────
+        { name: 'MicrosoftAppType', value: 'SingleTenant' }
+        { name: 'MicrosoftAppId', value: botAppId }
+        { name: 'MicrosoftAppPassword', value: botAppPassword }
+        { name: 'MicrosoftAppTenantId', value: botTenantId }
+        // ── Gov-cloud Bot Framework endpoints (empty = commercial) ─
+        { name: 'ChannelService', value: channelService }
+        { name: 'OAuthUrl', value: oAuthUrl }
+        // ── Microsoft Graph API endpoint ─────────────────────────
+        { name: 'GraphApiEndpoint', value: graphApiEndpoint }
       ]
       ftpsState: 'Disabled'
       minTlsVersion: '1.2'
@@ -90,8 +113,11 @@ resource functionApp 'Microsoft.Web/sites@2023-12-01' = {
   }
 }
 
-@description('Function App default hostname')
+@description('Function App default hostname (full HTTPS URL)')
 output defaultHostname string = 'https://${functionApp.properties.defaultHostName}'
 
 @description('Function App resource ID')
 output resourceId string = functionApp.id
+
+@description('Raw hostname (no scheme) — used to construct the Bot messaging endpoint')
+output rawHostname string = functionApp.properties.defaultHostName

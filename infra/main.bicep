@@ -22,6 +22,13 @@ param azureAdTenantId string
 @secure()
 param azureAdClientId string
 
+@description('Teams Calling Bot — Entra App Registration client ID. Run scripts/Create-BotAppRegistration.ps1 to generate this value.')
+param teamsBotAppId string
+
+@description('Teams Calling Bot — Entra App Registration client secret')
+@secure()
+param teamsBotAppPassword string
+
 // ─── Naming Convention ──────────────────────────────────────────
 var uniqueSuffix = uniqueString(resourceGroup().id)
 var namePrefix = '${baseName}-${environmentName}'
@@ -44,12 +51,18 @@ module storage 'modules/storage.bicep' = {
   }
 }
 
-// ─── Communication Services ────────────────────────────────────
-module communicationServices 'modules/communication-services.bicep' = {
+// ─── Azure Bot Service (Teams Calling) ─────────────────────────
+// The functionApp module is deployed first so we can pass its
+// hostname to the bot service as the messaging endpoint.
+// Bicep resolves this via the dependsOn implicit reference.
+module botService 'modules/bot-service.bicep' = {
   params: {
-    name: '${namePrefix}-acs-${uniqueSuffix}'
-    location: 'global' // ACS is a global resource
+    name: '${namePrefix}-bot-${uniqueSuffix}'
+    location: location
     tags: tags
+    microsoftAppId: teamsBotAppId
+    microsoftAppTenantId: azureAdTenantId
+    messagingEndpoint: 'https://${functionApp.outputs.rawHostname}/api/bot-messages'
   }
 }
 
@@ -94,7 +107,9 @@ module functionApp 'modules/function-app.bicep' = {
     storageAccountKey: storage.outputs.primaryKey
     appInsightsConnectionString: appInsights.outputs.connectionString
     cosmosDbConnectionString: cosmosDb.outputs.connectionString
-    acsConnectionString: communicationServices.outputs.connectionString
+    botAppId: teamsBotAppId
+    botAppPassword: teamsBotAppPassword
+    botTenantId: azureAdTenantId
     cognitiveServicesEndpoint: cognitiveServices.outputs.endpoint
     cognitiveServicesKey: cognitiveServices.outputs.primaryKey
     openAIEndpoint: openAI.outputs.endpoint
@@ -146,5 +161,8 @@ output adminPortalUrl string = appService.outputs.defaultHostname
 @description('PSTN Simulator URL')
 output simulatorUrl string = simulatorApp.outputs.defaultHostname
 
-@description('Communication Services resource ID')
-output acsResourceId string = communicationServices.outputs.resourceId
+@description('Bot Service name — register this in Teams Admin Center')
+output botServiceName string = botService.outputs.botName
+
+@description('Bot messaging endpoint — configure this in Teams Admin Center calling webhook')
+output botMessagingEndpoint string = botService.outputs.messagingEndpoint
