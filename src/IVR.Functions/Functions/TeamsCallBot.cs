@@ -46,7 +46,7 @@ namespace IVR.Functions.Functions;
 /// </summary>
 public class TeamsCallBot
 {
-    private readonly IBotFrameworkHttpAdapter _adapter;
+    private readonly IBotFrameworkHttpAdapter _adapter;  // Reserved for future messaging support
     private readonly GraphServiceClient? _graphClient;
     private readonly ICallFlowEngine _callFlowEngine;
     private readonly AniAliService _aniAliService;
@@ -70,7 +70,6 @@ public class TeamsCallBot
     private const string OpPlayThenCollect    = "play_then_collect";
 
     public TeamsCallBot(
-        IBotFrameworkHttpAdapter adapter,
         GraphServiceClient? graphClient,
         ICallFlowEngine callFlowEngine,
         AniAliService aniAliService,
@@ -83,7 +82,7 @@ public class TeamsCallBot
         IConfiguration configuration,
         ILogger<TeamsCallBot> logger)
     {
-        _adapter             = adapter;
+        _adapter             = null!;  // Not used — Graph notifications handled directly
         _graphClient         = graphClient;
         _callFlowEngine      = callFlowEngine;
         _aniAliService       = aniAliService;
