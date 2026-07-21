@@ -6,8 +6,6 @@ using IVR.Core.Services;
 using IVR.Functions.Services;
 using Microsoft.Azure.Cosmos;
 using Microsoft.Azure.Functions.Worker;
-using Microsoft.Bot.Builder.Integration.AspNet.Core;
-using Microsoft.Bot.Connector.Authentication;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
@@ -19,20 +17,6 @@ var host = new HostBuilder()
     {
         services.AddApplicationInsightsTelemetryWorkerService();
         services.ConfigureFunctionsApplicationInsights();
-
-        // ─── Bot Framework — Teams Calling adapter ───────────────
-        // CloudAdapter reads the following from IConfiguration
-        // (all set via Function App settings in infra/modules/function-app.bicep):
-        //   MicrosoftAppType     = SingleTenant
-        //   MicrosoftAppId       = Entra App Registration client ID
-        //   MicrosoftAppPassword = Entra App Registration client secret
-        //   MicrosoftAppTenantId = Entra tenant ID
-        //   ChannelService       = https://botframework.azure.us  (GCC High)
-        //                          (empty = commercial Azure)
-        // The adapter validates every inbound Teams request JWT before
-        // dispatching to TeamsCallBot.
-        services.AddSingleton<BotFrameworkAuthentication, ConfigurationBotFrameworkAuthentication>();
-        services.AddSingleton<IBotFrameworkHttpAdapter, CloudAdapter>();
 
         // ─── Microsoft Graph — call control ─────────────────────
         // GraphServiceClient issues the commands that actually control
