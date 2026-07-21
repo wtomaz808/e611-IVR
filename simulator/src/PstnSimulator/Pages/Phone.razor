@@ -56,6 +56,12 @@
                     <button class="btn btn-danger flex-fill" @onclick="HangUp" disabled="@(_activeCall == null)">
                         <i class="bi bi-telephone-x-fill me-1"></i> Hang Up
                     </button>
+                    @if (_activeCall != null && (_activeCall.State == CallState.Failed || _activeCall.State == CallState.Disconnected || _activeCall.State == CallState.IvrTransfer))
+                    {
+                        <button class="btn btn-outline-secondary" @onclick="ResetCall" title="Clear stale call and reset dialer">
+                            <i class="bi bi-arrow-counterclockwise"></i>
+                        </button>
+                    }
                 </div>
 
                 @* ─── DTMF Keypad ─── *@
@@ -335,6 +341,16 @@
     {
         if (_activeCall == null) return;
         await AcsBridge.DisconnectAsync(_activeCall.Id);
+    }
+
+    /// <summary>Force-clear a stale or stuck call without sending a disconnect notification.</summary>
+    private void ResetCall()
+    {
+        if (_activeCall != null)
+        {
+            CallManager.CompleteCall(_activeCall.Id, CallState.Failed, CallEventSource.System, "Manually reset by operator");
+        }
+        _activeCall = null;
     }
 
     private async Task SendDtmf(string key)
