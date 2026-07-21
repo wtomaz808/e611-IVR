@@ -62,7 +62,7 @@ public class MockTeamsBridge : IAcsBridge
             callerNumber: call.CallerNumber,
             calledNumber: call.DidNumber);
 
-        call.TransitionTo(CallState.SentToIvr, CallEventSource.Acs,
+        _callManager.TransitionCall(call.Id, CallState.SentToIvr, CallEventSource.Acs,
             "commsNotification (incoming) sent to Teams bot",
             $"POST {ivrEndpoint}/api/bot-messages");
 
@@ -80,8 +80,11 @@ public class MockTeamsBridge : IAcsBridge
 
         // Map simulator digit to Graph tone enum string
         var graphTone = MapDigitToGraphTone(tone);
-        call.DtmfInputs.Add(tone);
-        call.AddEvent(CallEventSource.Pstn, $"DTMF: {tone} → Graph tone: {graphTone}");
+        _callManager.UpdateCall(callId, c =>
+        {
+            c.DtmfInputs.Add(tone);
+            c.AddEvent(CallEventSource.Pstn, $"DTMF: {tone} → Graph tone: {graphTone}");
+        });
 
         var payload = BuildToneNotification(callId, graphTone);
         await PostToBotEndpointAsync(ivrEndpoint, payload, call,
@@ -99,12 +102,12 @@ public class MockTeamsBridge : IAcsBridge
 
         var ivrEndpoint = _config["IvrEndpoint"] ?? "http://localhost:7071";
 
-        call.SpeechInputs.Add(text);
-        call.AddEvent(CallEventSource.Pstn, $"Speech: \"{text}\"");
+        _callManager.UpdateCall(callId, c =>
+        {
+            c.SpeechInputs.Add(text);
+            c.AddEvent(CallEventSource.Pstn, $"Speech: \"{text}\"");
+        });
 
-        // Store the transcript so the IVR can retrieve it from CallLog.Metadata.
-        // The bot reads MetaPendingSpeech from Cosmos; in simulator mode we inject
-        // the transcript directly into the recordOperation notification via clientContext.
         var operationId = Guid.NewGuid().ToString();
         var payload = BuildRecordOperationNotification(callId, operationId, text);
         await PostToBotEndpointAsync(ivrEndpoint, payload, call,
@@ -118,7 +121,7 @@ public class MockTeamsBridge : IAcsBridge
         if (call == null) return;
 
         var ivrEndpoint = _config["IvrEndpoint"] ?? "http://localhost:7071";
-        call.AddEvent(CallEventSource.Pstn, "Caller disconnected");
+        _callManager.UpdateCall(callId, c => c.AddEvent(CallEventSource.Pstn, "Caller disconnected"));
 
         var payload = BuildCallStateNotification(callId, "terminated");
         await PostToBotEndpointAsync(ivrEndpoint, payload, call,
@@ -150,7 +153,7 @@ public class MockTeamsBridge : IAcsBridge
         // DELETE = hang up
         if (ctx.Request.Method == "DELETE")
         {
-            call?.TransitionTo(CallState.Disconnected, CallEventSource.Ivr, "Graph DELETE (hang up)");
+            _callManager.TransitionCall(callId, CallState.Disconnected, CallEventSource.Ivr, "Graph DELETE (hang up)");
             return Results.NoContent();
         }
 
@@ -170,8 +173,7 @@ public class MockTeamsBridge : IAcsBridge
 
     private async Task<IResult> HandleAnswerAsync(string callId, SimulatedCall? call)
     {
-        call?.TransitionTo(CallState.IvrAnswered, CallEventSource.Ivr, "Graph answer");
-
+        _callManager.TransitionCall(callId, CallState.IvrAnswered, CallEventSource.Ivr, "Graph answer");
 
         // Fire "established" notification after a short delay
         _ = Task.Run(async () =>
@@ -191,8 +193,26 @@ public class MockTeamsBridge : IAcsBridge
         var body = await reader.ReadToEndAsync();
 
         _logger.LogInformation("PlayPrompt for call {CallId}: {Body}", callId, body[..Math.Min(200, body.Length)]);
-        if (call != null) call.RecognizeType = null;
-        call?.TransitionTo(CallState.IvrPlaying, CallEventSource.Ivr, "Graph playPrompt — IVR playing audio");
+
+        // Extract audio URL from the playPrompt body so the simulator UI can play it
+        string? audioUrl = null;
+        try
+        {
+            var doc = JsonDocument.Parse(body);
+            audioUrl = doc.RootElement
+                .GetProperty("prompts")[0]
+                .GetProperty("mediaInfo")
+                .GetProperty("uri")
+                .GetString();
+        }
+        catch { /* ignore parse errors */ }
+
+        _callManager.UpdateCall(callId, c =>
+        {
+            c.RecognizeType = null;
+            if (audioUrl != null) c.CurrentPromptText = audioUrl;
+        });
+        _callManager.TransitionCall(callId, CallState.IvrPlaying, CallEventSource.Ivr, "Graph playPrompt — IVR playing audio");
 
         var operationId = Guid.NewGuid().ToString();
 
@@ -212,8 +232,8 @@ public class MockTeamsBridge : IAcsBridge
     private IResult HandleSubscribeToTone(string callId, SimulatedCall? call)
     {
         _pendingOps[callId] = "subscribed_to_tone";
-        if (call != null) call.RecognizeType = "dtmf";
-        call?.TransitionTo(CallState.IvrRecognizing, CallEventSource.Ivr,
+        _callManager.UpdateCall(callId, c => c.RecognizeType = "dtmf");
+        _callManager.TransitionCall(callId, CallState.IvrRecognizing, CallEventSource.Ivr,
             "Graph subscribeToTone — waiting for DTMF");
         return Results.Accepted(value: new { id = Guid.NewGuid().ToString(), status = "running" });
     }
@@ -221,8 +241,8 @@ public class MockTeamsBridge : IAcsBridge
     private IResult HandleRecordResponse(string callId, SimulatedCall? call)
     {
         _pendingOps[callId] = "recording";
-        if (call != null) call.RecognizeType = "speech";
-        call?.TransitionTo(CallState.IvrRecognizing, CallEventSource.Ivr,
+        _callManager.UpdateCall(callId, c => c.RecognizeType = "speech");
+        _callManager.TransitionCall(callId, CallState.IvrRecognizing, CallEventSource.Ivr,
             "Graph recordResponse — waiting for speech");
         return Results.Accepted(value: new { id = Guid.NewGuid().ToString(), status = "running" });
     }
@@ -233,7 +253,7 @@ public class MockTeamsBridge : IAcsBridge
         var body = await reader.ReadToEndAsync();
         _logger.LogInformation("Transfer call {CallId}: {Body}", callId, body[..Math.Min(200, body.Length)]);
 
-        call?.TransitionTo(CallState.IvrTransfer, CallEventSource.Ivr, "Graph transfer", body);
+        _callManager.TransitionCall(callId, CallState.IvrTransfer, CallEventSource.Ivr, "Graph transfer", body[..Math.Min(100, body.Length)]);
 
         // Fire "terminated" after a short delay to simulate transfer completing
         _ = Task.Run(async () =>
@@ -249,7 +269,7 @@ public class MockTeamsBridge : IAcsBridge
 
     private IResult HandleReject(string callId, SimulatedCall? call)
     {
-        call?.TransitionTo(CallState.Failed, CallEventSource.Ivr, "Graph reject");
+        _callManager.TransitionCall(callId, CallState.Failed, CallEventSource.Ivr, "Graph reject");
         return Results.Ok();
     }
 
@@ -409,15 +429,14 @@ public class MockTeamsBridge : IAcsBridge
         try
         {
             var result = await PostToBotEndpointRawAsync(ivrEndpoint, payload);
-            if (result)
-                call.AddEvent(CallEventSource.Acs, $"{description} → IVR accepted");
-            else
-                call.AddEvent(CallEventSource.Acs, $"{description} → IVR rejected");
+            _callManager.UpdateCall(call.Id, c => c.AddEvent(
+                CallEventSource.Acs,
+                result ? $"{description} → IVR accepted" : $"{description} → IVR rejected"));
             return result;
         }
         catch (Exception ex)
         {
-            call.TransitionTo(CallState.Failed, CallEventSource.System,
+            _callManager.TransitionCall(call.Id, CallState.Failed, CallEventSource.System,
                 $"Failed to reach IVR: {description}", ex.Message);
             return false;
         }

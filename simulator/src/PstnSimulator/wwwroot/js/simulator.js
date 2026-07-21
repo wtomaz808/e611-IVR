@@ -40,6 +40,35 @@ window.speakText = function (text) {
 };
 
 /**
+ * Play an audio file by URL (for Teams bot mode — IVR prompts are WAV files in Blob Storage)
+ * Falls back to a visual-only indicator if the URL can't be played (CORS restriction).
+ * @param {string} url - Audio file URL
+ */
+window.playAudioUrl = function (url) {
+    // Stop any existing audio
+    if (window._ivrAudio) {
+        window._ivrAudio.pause();
+        window._ivrAudio = null;
+    }
+    try {
+        const audio = new Audio(url);
+        audio.volume = 1.0;
+        audio.onerror = function () {
+            // CORS or network error — fall back to browser TTS placeholder
+            window.speakText("I V R prompt playing");
+            console.warn('Audio playback failed (CORS?), using TTS fallback. URL:', url);
+        };
+        audio.play().catch(function (err) {
+            window.speakText("I V R prompt playing");
+            console.warn('Audio play() rejected:', err.message);
+        });
+        window._ivrAudio = audio;
+    } catch (e) {
+        console.error('playAudioUrl error:', e);
+    }
+};
+
+/**
  * Stop any ongoing speech
  */
 window.stopSpeech = function () {
