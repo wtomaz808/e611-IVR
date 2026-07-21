@@ -9,7 +9,14 @@
 @inject IJSRuntime JS
 @implements IDisposable
 
-<h3 class="mb-3"><i class="bi bi-telephone-fill me-2"></i>Phone Simulator</h3>
+@{
+    var isTeamsMode = (Config["AcsMode"] ?? "Mock") == "TeamsBot";
+}
+
+<h3 class="mb-3">
+    <i class="bi bi-@(isTeamsMode ? "microsoft-teams" : "telephone-fill") me-2"></i>
+    @(isTeamsMode ? "Teams IVR Simulator" : "Phone Simulator")
+</h3>
 
 <div class="row">
     @* ─── LEFT: Dialer ─── *@
@@ -58,7 +65,7 @@
                         @foreach (var key in new[] { "1", "2", "3", "4", "5", "6", "7", "8", "9", "*", "0", "#" })
                         {
                             <button class="dtmf-key" @onclick="() => SendDtmf(key)"
-                                    disabled="@(_activeCall == null || _activeCall.State != CallState.IvrRecognizing || _activeCall.RecognizeType != "dtmf")">
+                                    disabled="@(_activeCall == null || _activeCall.State != CallState.IvrRecognizing)">
                                 @key
                             </button>
                         }
@@ -113,14 +120,14 @@
                         <div class="col-4 text-muted">DID</div>
                         <div class="col-8">@_activeCall.DidNumber</div>
                     </div>
-                    @if (_activeCall.TrunkName != null)
+                    @if (_activeCall.TrunkName != null && !isTeamsMode)
                     {
                         <div class="row mb-1">
                             <div class="col-4 text-muted">Trunk</div>
                             <div class="col-8">@_activeCall.TrunkName (ch @_activeCall.TrunkChannel)</div>
                         </div>
                     }
-                    @if (_activeCall.VdnNumber != null)
+                    @if (_activeCall.VdnNumber != null && !isTeamsMode)
                     {
                         <div class="row mb-1">
                             <div class="col-4 text-muted">VDN</div>
@@ -166,11 +173,14 @@
                 <div class="call-trace">
                     @if (_activeCall != null)
                     {
-                        @foreach (var evt in _activeCall.Events)
+                        @foreach (var evt in _activeCall.Events.Where(e =>
+                            !isTeamsMode || (e.Source != CallEventSource.Cm10)))
                         {
+                            var sourceLabel = isTeamsMode && evt.Source == CallEventSource.Acs
+                                ? "Teams" : evt.Source.ToString();
                             <div class="trace-entry">
                                 <span class="trace-time">@evt.Timestamp.ToString("HH:mm:ss.fff")</span>
-                                <span class="trace-source @GetSourceClass(evt.Source)">@evt.Source</span>
+                                <span class="trace-source @GetSourceClass(evt.Source)">@sourceLabel</span>
                                 <span class="trace-message">@evt.Message</span>
                                 @if (!string.IsNullOrEmpty(evt.Detail))
                                 {
@@ -222,30 +232,33 @@
         var did = PstnService.GetDids().FirstOrDefault(d => d.Number == _selectedDid);
         if (did == null) return;
 
-        // Check for blocked callers
-        if (PstnService.IsCallerBlocked(_selectedCaller))
-        {
-            return;
-        }
+        if (PstnService.IsCallerBlocked(_selectedCaller)) return;
 
-        // Create the call
         var call = CallManager.CreateCall(caller, did);
         _activeCall = call;
 
-        // 1. PSTN carrier delivers call to CM10 (seize inbound trunk)
+        // ── Teams Bot mode: skip CM10/SBC/trunk entirely ─────────────────────
+        if ((Config["AcsMode"] ?? "Mock") == "TeamsBot")
+        {
+            CallManager.TransitionCall(call.Id, CallState.SentToIvr, CallEventSource.Pstn,
+                $"Teams Phone System: Incoming call on {did.Label} ({did.Number})",
+                $"Routing to Teams Calling Bot → /api/bot-messages");
+            await AcsBridge.OriginateCallAsync(call);
+            return;
+        }
+
+        // ── Legacy mode: CM10 → SBC → ACS ───────────────────────────────────
         var inbound = PstnService.SeizeInboundChannel(_selectedDid);
         if (inbound == null)
         {
-            CallManager.CompleteCall(call.Id, CallState.Failed, CallEventSource.Pstn, "Inbound carrier trunk full — cannot deliver call");
+            CallManager.CompleteCall(call.Id, CallState.Failed, CallEventSource.Pstn, "Inbound carrier trunk full");
             return;
         }
         call.TrunkName = inbound.Value.TrunkName;
         call.TrunkChannel = inbound.Value.Channel;
-
         CallManager.TransitionCall(call.Id, CallState.TrunkSeized, CallEventSource.Pstn,
             $"PSTN → CM10: Carrier trunk {inbound.Value.TrunkName} channel {inbound.Value.Channel} seized");
 
-        // 2. CM10 VDN routing
         var vdnNumber = PstnService.GetVdnForDid(_selectedDid);
         if (vdnNumber != null)
         {
@@ -259,66 +272,43 @@
 
                 if (routing.Destination == "IVR")
                 {
-                    // 3. CM10 routes outbound through gateway/SBC to ACS
                     var outbound = PstnService.SeizeOutboundChannel();
                     if (outbound == null)
                     {
                         CallManager.CompleteCall(call.Id, CallState.Failed, CallEventSource.Cm10,
-                            "CM10 → Gateway failed: no outbound gateway/trunk available (unregistered or full)");
+                            "CM10 → Gateway failed: no outbound gateway/trunk available");
                         PstnService.ReleaseChannel(inbound.Value.TrunkName);
                         return;
                     }
                     call.GatewayName = outbound.Value.GatewayName;
-
                     CallManager.TransitionCall(call.Id, CallState.VdnRouting, CallEventSource.Cm10,
                         $"CM10 → Gateway: Outbound trunk {outbound.Value.TrunkName} via {outbound.Value.GatewayName}",
-                        $"Gateway routes SIP to ACS via Direct Routing");
-
-                    // Route to IVR through ACS
+                        "Gateway routes SIP to ACS via Direct Routing");
                     await AcsBridge.OriginateCallAsync(call);
                 }
                 else if (routing.Destination?.StartsWith("Queue:") == true)
                 {
-                    // Route directly to queue (bypass IVR)
                     var queueName = routing.Destination[6..];
-                    CallManager.TransitionCall(call.Id, CallState.AcdQueued, CallEventSource.Cm10,
-                        $"Direct queue routing: {queueName}");
+                    CallManager.TransitionCall(call.Id, CallState.AcdQueued, CallEventSource.Cm10, $"Direct queue routing: {queueName}");
                     var assignment = Cm10Service.AssignAgent(queueName);
                     if (assignment != null)
                     {
                         call.AssignedAgentId = assignment.AgentId;
                         call.AssignedAgentName = assignment.AgentName;
-                        CallManager.TransitionCall(call.Id, CallState.AgentConnected, CallEventSource.Agent,
-                            $"Agent {assignment.AgentName} connected");
+                        CallManager.TransitionCall(call.Id, CallState.AgentConnected, CallEventSource.Agent, $"Agent {assignment.AgentName} connected");
                     }
                 }
             }
             else
             {
-                CallManager.TransitionCall(call.Id, CallState.VdnRouting, CallEventSource.Cm10,
-                    $"VDN {vdnNumber} routing failed", routing.Error);
-
-                // Still try to route to IVR via gateway
                 var outbound = PstnService.SeizeOutboundChannel();
-                if (outbound != null)
-                {
-                    call.GatewayName = outbound.Value.GatewayName;
-                    await AcsBridge.OriginateCallAsync(call);
-                }
+                if (outbound != null) { call.GatewayName = outbound.Value.GatewayName; await AcsBridge.OriginateCallAsync(call); }
             }
         }
         else
         {
-            // No VDN mapping — route directly to IVR via gateway
-            CallManager.TransitionCall(call.Id, CallState.VdnRouting, CallEventSource.Pstn,
-                "No VDN mapping — routing directly to IVR via gateway");
-
             var outbound = PstnService.SeizeOutboundChannel();
-            if (outbound != null)
-            {
-                call.GatewayName = outbound.Value.GatewayName;
-                await AcsBridge.OriginateCallAsync(call);
-            }
+            if (outbound != null) { call.GatewayName = outbound.Value.GatewayName; await AcsBridge.OriginateCallAsync(call); }
         }
     }
 

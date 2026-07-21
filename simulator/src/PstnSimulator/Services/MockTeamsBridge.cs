@@ -191,7 +191,8 @@ public class MockTeamsBridge : IAcsBridge
         var body = await reader.ReadToEndAsync();
 
         _logger.LogInformation("PlayPrompt for call {CallId}: {Body}", callId, body[..Math.Min(200, body.Length)]);
-        call?.AddEvent(CallEventSource.Ivr, "Graph playPrompt");
+        if (call != null) call.RecognizeType = null;
+        call?.TransitionTo(CallState.IvrPlaying, CallEventSource.Ivr, "Graph playPrompt — IVR playing audio");
 
         var operationId = Guid.NewGuid().ToString();
 
@@ -211,14 +212,18 @@ public class MockTeamsBridge : IAcsBridge
     private IResult HandleSubscribeToTone(string callId, SimulatedCall? call)
     {
         _pendingOps[callId] = "subscribed_to_tone";
-        call?.AddEvent(CallEventSource.Ivr, "Graph subscribeToTone — simulator ready for DTMF");
+        if (call != null) call.RecognizeType = "dtmf";
+        call?.TransitionTo(CallState.IvrRecognizing, CallEventSource.Ivr,
+            "Graph subscribeToTone — waiting for DTMF");
         return Results.Accepted(value: new { id = Guid.NewGuid().ToString(), status = "running" });
     }
 
     private IResult HandleRecordResponse(string callId, SimulatedCall? call)
     {
         _pendingOps[callId] = "recording";
-        call?.AddEvent(CallEventSource.Ivr, "Graph recordResponse — simulator ready for speech");
+        if (call != null) call.RecognizeType = "speech";
+        call?.TransitionTo(CallState.IvrRecognizing, CallEventSource.Ivr,
+            "Graph recordResponse — waiting for speech");
         return Results.Accepted(value: new { id = Guid.NewGuid().ToString(), status = "running" });
     }
 
