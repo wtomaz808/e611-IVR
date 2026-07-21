@@ -20,6 +20,9 @@ param modelName string = 'gpt-4.1'
 @description('OpenAI model version')
 param modelVersion string = '2025-04-14'
 
+@description('Deployment SKU — Standard for gpt-4.x, GlobalStandard for gpt-5.x')
+param deploymentSku string = 'GlobalStandard'
+
 resource openAIAccount 'Microsoft.CognitiveServices/accounts@2023-10-01-preview' = {
   name: name
   location: location
@@ -38,7 +41,7 @@ resource gptDeployment 'Microsoft.CognitiveServices/accounts/deployments@2023-10
   parent: openAIAccount
   name: deploymentName
   sku: {
-    name: 'Standard'
+    name: deploymentSku
     capacity: 10
   }
   properties: {

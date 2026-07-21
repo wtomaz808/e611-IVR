@@ -24,3 +24,8 @@ param teamsBotAppId = '251948e8-7012-4fc4-a6b6-59e82c9dd983'
 // teamsBotAppPassword is injected at deploy time via --parameters teamsBotAppPassword=$botSecret
 // to avoid storing the secret in source control.
 param teamsBotAppPassword = ''
+
+// Bot Service ARM deployment disabled — Gov subscription returns 'APS not implemented'.
+// Create the bot manually: portal.azure.us > Microsoft Foundry > Bot services > + Create
+// Then add Teams channel and set callingWebhook to the botMessagingEndpoint output.
+param deployBotService = false

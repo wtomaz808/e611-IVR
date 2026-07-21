@@ -29,6 +29,9 @@ param teamsBotAppId string
 @secure()
 param teamsBotAppPassword string
 
+@description('Deploy the Azure Bot Service resource via Bicep. Set false for Azure Government subscriptions where the ARM provider returns APS errors; create the bot manually in the portal instead.')
+param deployBotService bool = false
+
 // ─── Naming Convention ──────────────────────────────────────────
 var uniqueSuffix = uniqueString(resourceGroup().id)
 var namePrefix = '${baseName}-${environmentName}'
@@ -55,7 +58,9 @@ module storage 'modules/storage.bicep' = {
 // The functionApp module is deployed first so we can pass its
 // hostname to the bot service as the messaging endpoint.
 // Bicep resolves this via the dependsOn implicit reference.
-module botService 'modules/bot-service.bicep' = {
+// NOTE: Set deployBotService=false for Azure Government subscriptions
+// that return 'APS not implemented' — create the bot manually in the portal.
+module botService 'modules/bot-service.bicep' = if (deployBotService) {
   params: {
     name: '${namePrefix}-bot-${uniqueSuffix}'
     location: location
@@ -76,9 +81,10 @@ module cognitiveServices 'modules/cognitive-services.bicep' = {
 }
 
 // ─── Azure OpenAI (Transcript Intent Classification) ────────────
-// gpt-4.1 (2025-04-14) — confirmed available in Azure Government.
-// gpt-4.5 is NOT yet available in Azure Government as of July 2026.
-// Re-evaluate when https://aka.ms/oai/gov-models is updated.
+// gpt-5.1 (2025-11-13) is registered in usgovvirginia but has no SKUs
+// configured — cannot be deployed via API. Using gpt-4.1 (2025-04-14)
+// which is confirmed available. Re-check gpt-5.1 availability with your
+// MSFT team (may require provisioned throughput or special approval).
 module openAI 'modules/openai.bicep' = {
   params: {
     name: '${namePrefix}-openai-${uniqueSuffix}'
@@ -87,6 +93,7 @@ module openAI 'modules/openai.bicep' = {
     deploymentName: 'gpt-41'
     modelName: 'gpt-4.1'
     modelVersion: '2025-04-14'
+    deploymentSku: 'Standard'
   }
 }
 
@@ -142,7 +149,7 @@ module simulatorApp 'modules/simulator-app.bicep' = {
     tags: tags
     appServicePlanId: appService.outputs.planId
     ivrEndpoint: 'https://${functionApp.outputs.defaultHostname}'
-    acsMode: 'Mock'  // Use Mock mode by default for testing
+    acsMode: 'TeamsBot'  // Teams calling bot mode — no ACS
   }
 }
 
@@ -164,7 +171,7 @@ output adminPortalUrl string = appService.outputs.defaultHostname
 output simulatorUrl string = simulatorApp.outputs.defaultHostname
 
 @description('Bot Service name — register this in Teams Admin Center')
-output botServiceName string = botService.outputs.botName
+output botServiceName string = deployBotService ? (botService.outputs.botName ?? 'unknown') : 'create-manually-in-portal'
 
 @description('Bot messaging endpoint — configure this in Teams Admin Center calling webhook')
-output botMessagingEndpoint string = botService.outputs.messagingEndpoint
+output botMessagingEndpoint string = 'https://${functionApp.outputs.rawHostname}/api/bot-messages'
