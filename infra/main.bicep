@@ -148,7 +148,7 @@ module simulatorApp 'modules/simulator-app.bicep' = {
     location: location
     tags: tags
     appServicePlanId: appService.outputs.planId
-    ivrEndpoint: 'https://${functionApp.outputs.defaultHostname}'
+    ivrEndpoint: functionApp.outputs.defaultHostname
     acsMode: 'TeamsBot'  // Teams calling bot mode — no ACS
   }
 }
