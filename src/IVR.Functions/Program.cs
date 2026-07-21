@@ -47,10 +47,15 @@ var host = new HostBuilder()
         var graphEndpoint  = context.Configuration["GraphApiEndpoint"]
                              ?? "https://graph.microsoft.com/v1.0";
 
+        // Gov cloud is determined by ChannelService (reliable) rather than
+        // GraphApiEndpoint, which may point to a simulator URL in dev/demo mode.
+        var channelService = context.Configuration["ChannelService"] ?? "";
+        var isGovCloud = channelService.Contains("azure.us", StringComparison.OrdinalIgnoreCase)
+                      || graphEndpoint.Contains("microsoft.us", StringComparison.OrdinalIgnoreCase);
+
         if (!string.IsNullOrEmpty(botAppId) && !string.IsNullOrEmpty(botAppPassword)
                                              && !string.IsNullOrEmpty(botTenantId))
         {
-            var isGovCloud   = graphEndpoint.Contains("microsoft.us", StringComparison.OrdinalIgnoreCase);
             var authorityHost = isGovCloud
                 ? AzureAuthorityHosts.AzureGovernment
                 : AzureAuthorityHosts.AzurePublicCloud;
