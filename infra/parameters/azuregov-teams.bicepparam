@@ -5,6 +5,19 @@ using '../main.bicep'
 // Resource Group : rg-ivr-teams
 // Region         : usgovvirginia (US Gov Virginia)
 // Environment    : teams  (Teams calling bot — no ACS)
+// Last deployed  : 2026-07-20  (ivr-teams-deploy-20260720g — Succeeded)
+//
+// Deployed URLs:
+//   Function App  : https://ivr-teams-func-hgknk444g237w.azurewebsites.us
+//   Admin Portal  : https://ivr-teams-admin-hgknk444g237w.azurewebsites.us
+//   Bot Endpoint  : https://ivr-teams-func-hgknk444g237w.azurewebsites.us/api/bot-messages
+//
+// Bot Service: create manually in portal (ARM provider APS error in this sub)
+//   portal.azure.us > Microsoft Foundry > Bot services > + Create
+//   Bot handle    : ivr-teams-bot-hgknk444g237w
+//   App ID        : 251948e8-7012-4fc4-a6b6-59e82c9dd983
+//   Tenant ID     : 5af05be5-b9df-43d4-8897-ec17d3118935
+//   Messaging URL : https://ivr-teams-func-hgknk444g237w.azurewebsites.us/api/bot-messages
 // ─────────────────────────────────────────────────────────────────
 
 param environmentName = 'teams'
