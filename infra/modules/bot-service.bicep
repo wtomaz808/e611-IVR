@@ -22,7 +22,8 @@ param tags object
 @description('Entra App Registration Application (client) ID for the bot')
 param microsoftAppId string
 
-@description('Entra tenant ID that owns the App Registration')
+@description('Entra tenant ID (retained for azurebot kind upgrade path)')
+#disable-next-line no-unused-params
 param microsoftAppTenantId string
 
 @description('Full HTTPS URL of the Function App bot messaging endpoint. Format: https://<functionapp>.azurewebsites.{suffix}/api/bot-messages')
@@ -37,6 +38,8 @@ param botDescription string = 'E911 IVR Teams Calling Bot — routes and manages
 // ─── Bot Channels Registration ──────────────────────────────────
 // S1 (Standard) is required for Teams calling; F0 (Free) does not
 // support telephony or real-time media bots.
+// kind: 'sdk' = classic Bot Channels Registration — required for Azure Government.
+// kind: 'azurebot' (Azure Bot) uses APS which is not implemented in Gov cloud.
 resource botService 'Microsoft.BotService/botServices@2022-09-15' = {
   name: name
   location: 'global' // Microsoft.BotService is a global resource — region param is ignored
@@ -44,21 +47,15 @@ resource botService 'Microsoft.BotService/botServices@2022-09-15' = {
   sku: {
     name: 'S1'
   }
-  kind: 'azurebot'
+  kind: 'sdk'
   properties: {
     displayName: displayName
     description: botDescription
     endpoint: messagingEndpoint
     msaAppId: microsoftAppId
-    msaAppTenantId: microsoftAppTenantId
-    // SingleTenant — bot and its app registration live in the same tenant.
-    // Use MultiTenant only if the bot must accept calls from multiple tenants.
-    msaAppType: 'SingleTenant'
+    // Note: msaAppType and msaAppTenantId are properties of 'azurebot' kind only.
+    // For 'sdk' kind, tenancy is controlled by the App Registration itself.
     isStreamingSupported: false
-    isCmekEnabled: false
-    // Disable public network access if you want to lock down the bot
-    // to a private endpoint later. 'Enabled' is required for Teams calling.
-    publicNetworkAccess: 'Enabled'
   }
 }
 
