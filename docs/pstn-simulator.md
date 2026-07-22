@@ -1,6 +1,6 @@
-# PSTN & CM10 Simulator
+# PSTN Simulator
 
-A standalone Blazor Server application that simulates the PSTN layer and Avaya CM10 environment for end-to-end testing of the IVR system — **no Azure or telephony hardware required**.
+A standalone Blazor Server application that simulates the Microsoft Teams Phone System and the Microsoft Graph Calling API for end-to-end testing of the IVR system — **no Azure or telephony hardware required**.
 
 ## Architecture
 
@@ -9,9 +9,9 @@ A standalone Blazor Server application that simulates the PSTN layer and Avaya C
 │               PSTN Simulator                     │
 │                                                  │
 │  ┌──────────┐   ┌──────────┐   ┌──────────────┐ │
-│  │  Phone    │   │   CM10   │   │  Mock ACS    │ │
-│  │  Dialer   │   │  Engine  │   │  REST API    │ │
-│  │  (UI)     │   │          │   │  /calling/*  │ │
+│  │  Phone    │   │   CM10   │   │  Mock Teams  │ │
+│  │  Dialer   │   │  Engine  │   │  Graph API   │ │
+│  │  (UI)     │   │          │   │  /graph/v1.0 │ │
 │  └────┬─────┘   └────┬─────┘   └──────┬───────┘ │
 │       │              │                 │         │
 │  ┌────┴──────────────┴─────────────────┴───────┐ │
@@ -19,7 +19,7 @@ A standalone Blazor Server application that simulates the PSTN layer and Avaya C
 │  │      (in-memory, real-time events)          │ │
 │  └─────────────────────┬───────────────────────┘ │
 └────────────────────────┼─────────────────────────┘
-                         │  EventGrid + Callbacks
+                         │  commsNotifications + Graph calls
                          ▼
 ┌──────────────────────────────────────────────────┐
 │               IVR Functions                      │
@@ -27,44 +27,27 @@ A standalone Blazor Server application that simulates the PSTN layer and Avaya C
 └──────────────────────────────────────────────────┘
 ```
 
-## Operating Modes
+## Operating Mode (Teams Bot)
 
-### Mock Mode (Default)
-
-The simulator runs a **fake ACS Call Automation REST API** on the same port as the Blazor UI. The IVR Functions connect to this mock instead of real Azure Communication Services.
+The simulator runs a **mock Microsoft Graph Calling API** on the same port as the Blazor UI. The IVR Functions connect to this mock instead of the real Microsoft Graph, enabling fully offline end-to-end testing.
 
 **How it works:**
 
-1. Simulator sends an EventGrid `IncomingCall` event to the IVR endpoint
-2. IVR calls `AnswerCallAsync` → hits the mock REST API at `/calling/callConnections:answer`
-3. Mock returns a valid response and sends a `CallConnected` callback
-4. IVR plays prompts → mock captures content, displays in UI, sends `PlayCompleted`
-5. IVR starts recognize → mock waits for user DTMF/speech input from the simulator UI
-6. IVR transfers → mock routes through CM10 engine for agent assignment
+1. Simulator sends a `commsNotification` (incoming call) to the IVR endpoint (`/api/bot-messages`)
+2. IVR calls `PATCH /communications/calls/{callId}` to answer → hits the mock Graph API at `/graph/v1.0/`
+3. Mock returns a valid response and sends a `CallEstablished` notification
+4. IVR plays prompts → mock captures the prompt URL, fires `playPromptOperation` completion
+5. IVR subscribes to tones → mock waits for user DTMF input from the simulator UI
+6. IVR transfers → mock routes call to transferred state
 
-**IVR Configuration for Mock Mode:**
-
-```env
-ACS_CONNECTION_STRING=endpoint=http://pstn-simulator:8080;accesskey=bW9ja2tleQ==
-CALLBACK_BASE_URL=http://ivr-functions:80
-```
-
-### Live Mode
-
-The simulator uses a **real Azure Communication Services** instance to originate calls. DTMF tones are sent via the real SDK. Call state is tracked via real ACS callbacks.
-
-**Requirements:**
-- Valid ACS connection string
-- Phone number purchased in ACS
-- Direct Routing configured for your DIDs
-
-**IVR Configuration for Live Mode:**
+**IVR Configuration for Simulator Mode:**
 
 ```env
-ACS_CONNECTION_STRING=endpoint=https://your-acs.communication.azure.com/;accesskey=...
+IVR_MODE=TeamsBot
+GRAPH_API_ENDPOINT=http://pstn-simulator:8080/graph/v1.0
+TEAMS_BOT_APP_ID=simulator
+TEAMS_BOT_APP_PASSWORD=simulator
 ```
-
-> **Note:** Live mode incurs per-minute charges on your ACS resource.
 
 ## Quick Start
 
@@ -114,7 +97,7 @@ Update the IVR's docker-compose environment:
 
 ```yaml
 environment:
-  - ACS_CONNECTION_STRING=endpoint=http://pstn-simulator:8080;accesskey=bW9ja2tleQ==
+  - GRAPH_API_ENDPOINT=http://pstn-simulator:8080/graph/v1.0
   - CALLBACK_BASE_URL=http://ivr-functions:80
 ```
 
@@ -194,7 +177,7 @@ All simulation parameters are in `appsettings.json`:
 | `Agents[].State` | Initial state: `Available`, `OnBreak`, `Offline` |
 | `Agents[].Skills` | Agent skill tags |
 
-## Mock ACS API Endpoints
+## Mock Teams Graph API Endpoints
 
 The mock implements these ACS Call Automation REST API endpoints:
 
@@ -264,7 +247,7 @@ docker network create ivr-network
 #     external: true
 
 # Update IVR environment:
-# ACS_CONNECTION_STRING=endpoint=http://pstn-simulator:8080;accesskey=bW9ja2tleQ==
+# GRAPH_API_ENDPOINT=http://pstn-simulator:8080/graph/v1.0
 
 # Update simulator environment:
 # IvrEndpoint=http://ivr-functions:80
@@ -274,7 +257,7 @@ docker network create ivr-network
 
 | Issue | Solution |
 |-------|----------|
-| IVR can't reach mock ACS | Ensure both containers are on the same Docker network |
+| IVR can't reach mock Graph API | Ensure both containers are on the same Docker network |
 | "No trunk capacity" | Increase `Trunks[].Capacity` in appsettings.json |
 | DTMF keys disabled | Call must be in `IvrRecognizing` state with `recognizeType=dtmf` |
 | Speech input disabled | IVR must use speech recognition (not DTMF) |

@@ -14,7 +14,6 @@ This guide covers deploying the E911 IVR system to **Azure Government** cloud en
 
 | Service | Status in Azure Gov | Notes |
 |---------|-------------------|-------|
-| Azure Communication Services | ✅ Available | Use `dataLocation: 'unitedstates'` |
 | Azure Cognitive Services (Speech) | ✅ Available | Standard SKU supported |
 | Azure OpenAI | ⚠️ **Limited Availability** | Requires special approval - [Apply here](https://aka.ms/oai/access) |
 | Cosmos DB | ✅ Available | Serverless mode supported |
@@ -35,10 +34,6 @@ This guide covers deploying the E911 IVR system to **Azure Government** cloud en
    - **Requires separate approval** for Azure Government
    - May have limited model availability compared to public cloud
    - If not approved, the system can run without AI-powered routing (falls back to DTMF-based menus)
-
-3. **Azure Communication Services**:
-   - PSTN number availability may differ from public cloud
-   - Direct Routing fully supported for existing phone numbers
 
 ## Prerequisites
 
@@ -115,7 +110,6 @@ az deployment group create \
 This will provision:
 - Cosmos DB (serverless)
 - Storage Account
-- Azure Communication Services
 - Cognitive Services (Speech)
 - Azure OpenAI (if available)
 - Function App
@@ -124,33 +118,7 @@ This will provision:
 
 Deployment takes approximately **15-20 minutes**.
 
-### Step 4: Configure Event Grid
-
-After deployment, configure Event Grid to route incoming call events to your Function App:
-
-```bash
-# Get the Function App endpoint
-FUNCTION_ENDPOINT=$(az deployment group show \
-  --resource-group rg-ivr-dev \
-  --name main \
-  --query properties.outputs.functionAppUrl.value -o tsv)
-
-# Get the ACS resource ID
-ACS_RESOURCE_ID=$(az deployment group show \
-  --resource-group rg-ivr-dev \
-  --name main \
-  --query properties.outputs.acsResourceId.value -o tsv)
-
-# Create Event Grid subscription
-az eventgrid event-subscription create \
-  --name ivr-incoming-calls \
-  --source-resource-id $ACS_RESOURCE_ID \
-  --endpoint "https://$FUNCTION_ENDPOINT/api/IncomingCallHandler" \
-  --endpoint-type webhook \
-  --included-event-types Microsoft.Communication.IncomingCall
-```
-
-### Step 5: Deploy Application Code
+### Step 4: Deploy Application Code
 
 ```bash
 # Deploy Function App

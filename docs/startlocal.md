@@ -58,7 +58,7 @@ TEAMS_BOT_TENANT_ID=simulator
 GRAPH_API_ENDPOINT=http://pstn-simulator:8080/graph/v1.0
 
 # Simulator mode
-ACS_MODE=TeamsBot
+IVR_MODE=TeamsBot
 ```
 
 For a richer demo with real Cosmos DB, AI routing, and TTS:
@@ -168,7 +168,7 @@ GRAPH_API_ENDPOINT=https://graph.microsoft.us/v1.0
 TEAMS_CHANNEL_SERVICE=https://botframework.azure.us
 
 # Switch simulator to not intercept Graph calls
-ACS_MODE=Mock   # or remove it entirely once real Teams is live
+IVR_MODE=Live   # remove once real Teams is configured
 ```
 
 Then run:

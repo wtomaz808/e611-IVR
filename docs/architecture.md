@@ -20,31 +20,27 @@ The system comprises three deployable components:
  ┌───────────────────────────────────────────────────────────────────────────────┐
  │                              Azure Cloud                                     │
  │                                                                               │
- │  Inbound Call (Native ACS or Direct Routing / SIP Trunk)                      │
- │  ───────────►  ┌──────────────────┐     ┌───────────────┐                    │
- │                │ Azure Comm.      │────►│ Azure Event   │                    │
- │   PSTN ──────► │ Services (ACS)   │     │ Grid          │                    │
- │                └────────┬─────────┘     └───────┬───────┘                    │
- │                         │                       │                            │
- │   SIP ───────►  ┌───────┴────────┐              │                            │
- │   (Direct       │ Session Border │              │                            │
- │    Routing)     │ Controller(SBC)│──────────────┘                            │
- │                 └────────────────┘                                            │
+ │  Inbound Call (Teams Direct Routing / PSTN)                                   │
+ │                                                                               │
+ │   PSTN ──────► ┌──────────────────┐     commsNotification                   │
+ │   (Direct       │ Microsoft Teams  │────────────────────────────────────────► │
+ │    Routing)     │ Phone System     │                                          │
+ │                 └──────────────────┘                                          │
  │                                                 │                            │
  │                                                 ▼                            │
  │                ┌──────────────────┐     ┌───────────────────────────────┐    │
  │                │ Azure Cognitive  │◄───►│ Azure Functions (IVR Engine)  │    │
  │                │ Services (Speech)│     │                               │    │
- │                └──────────────────┘     │  ┌─ IncomingCallHandler       │    │
- │                                        │  │  (Event Grid trigger)      │    │
- │                ┌──────────────────┐    │  ├─ CallbackHandler            │    │
- │                │ Azure OpenAI     │◄──►│  │  (HTTP callback trigger)   │    │
- │                │ (GPT-4o)         │    │  ├─ TranscriptRoutingService   │    │
- │                └──────────────────┘    │  ├─ ExternalSystemIntegration  │    │
- │                                        │  ├─ CallFlowEngine             │    │
- │                ┌──────────────────┐    │  ├─ AniAliService              │    │
- │                │ Blob Storage     │◄──►│  └─ PromptService              │    │
- │                │ (Audio Prompts)  │    └──────────────┬────────────────┘    │
+ │                └──────────────────┘     │  ┌─ TeamsCallBot              │    │
+ │                                        │  │  POST /api/bot-messages    │    │
+ │                ┌──────────────────┐    │  ├─ TranscriptRoutingService   │    │
+ │                │ Azure OpenAI     │◄──►│  ├─ ExternalSystemIntegration  │    │
+ │                │ (GPT-4o)         │    │  ├─ CallFlowEngine             │    │
+ │                └──────────────────┘    │  ├─ AniAliService              │    │
+ │                                        │  └─ PromptService              │    │
+ │                ┌──────────────────┐    └──────────────┬────────────────┘    │
+ │                │ Blob Storage     │◄──►               │                      │
+ │                │ (Audio Prompts)  │                   │                      │
  │                └──────────────────┘                   │                      │
  │                                                       ▼                      │
  │  ┌──────────────────┐                   ┌──────────────────────────────┐    │
@@ -79,33 +75,28 @@ The system comprises three deployable components:
 Every inbound call follows this sequence:
 
 ### 1. Call Arrival
-- A caller dials a phone number. The number can be:
-  - **ACS-native**: purchased and provisioned inside Azure Communication Services.
-  - **Direct-routed**: an existing PSTN number routed through a customer-owned Session Border Controller (SBC) into ACS.
-  - **SIP trunk**: an existing number routed via a third-party SIP trunk provider (e.g., Twilio Elastic SIP, Bandwidth).
-- ACS emits a `Microsoft.Communication.IncomingCall` event to **Azure Event Grid**.
+- A caller dials a phone number provisioned in **Microsoft Teams Phone System** via Direct Routing.
+- Teams Phone System emits a `commsNotification` (incoming call) to the IVR bot endpoint via the **Microsoft Graph Calling API**.
 
-### 2. IncomingCallHandler (Event Grid Trigger)
-- Receives the Event Grid event.
-- Extracts `callerNumber`, `calledNumber`, and `incomingCallContext`.
-  - For ACS-native numbers, these are read from `from.phoneNumber.value` / `to.phoneNumber.value`.
-  - For direct-routed / SIP trunk numbers, the handler falls back to `from.rawId` / `to.rawId` and parses SIP URIs (e.g., `sip:+15551234567@sbc.contoso.com` → `+15551234567`).
+### 2. TeamsCallBot (HTTP Trigger — `/api/bot-messages`)
+- Receives the Microsoft Graph `commsNotification`.
+- Extracts `callerNumber` and `calledNumber` from the notification resource.
 - Performs **ANI/ALI lookup** via `AniAliService` to identify the caller (name, account, VIP status, location).
 - Checks if the caller is **blocked** — if yes, rejects the call immediately.
 - Creates a `CallLog` record in Cosmos DB.
-- **Answers the call** via the Call Automation SDK, providing a callback URL (`/api/callbacks/{callId}`).
-- Configures Cognitive Services for in-call speech recognition.
+- **Answers the call** via `PATCH /communications/calls/{callId}` on the Microsoft Graph API.
+- Determines the root menu and plays the welcome prompt via TTS (Cognitive Services → Blob Storage SAS URL).
 
-### 3. CallbackHandler (HTTP Trigger)
-All subsequent call events (connect, DTMF, speech, play complete, disconnect) arrive as HTTP callbacks:
+### 3. Subsequent Call Events (same `/api/bot-messages` endpoint)
+All mid-call events arrive as further `commsNotification` POSTs to the same endpoint:
 
-| Event | Handler |
+| Notification | Handler |
 |---|---|
-| `CallConnected` | Resolves the appropriate menu via `CallFlowEngine`, plays the welcome prompt, starts input collection |
-| `RecognizeCompleted` | Parses DTMF tones or speech transcript; for DTMF menus, processes the input through `CallFlowEngine.ProcessInputAsync`; for speech-routing menus, sends transcript to `TranscriptRoutingService` |
-| `RecognizeFailed` | Replays the menu prompt (timeout/no-input handling) |
-| `PlayCompleted` | Logs completion |
-| `CallDisconnected` | Finalizes the `CallLog` (end time, duration, disposition) |
+| Call established | Resolves the appropriate menu via `CallFlowEngine`, plays the welcome prompt, starts tone subscription |
+| Tone received (DTMF) | Matches key to `MenuOption.DtmfKey`, executes action via `ExecuteActionAsync` |
+| Play prompt completed | Subscribes to tones / starts record operation for next input |
+| Record completed | Extracts transcript from `clientContext`, routes via `TranscriptRoutingService` |
+| Call terminated | Finalizes the `CallLog` (end time, duration, disposition) |
 
 ### 4. Menu Resolution (`CallFlowEngine`)
 The engine determines which menu to present based on a priority waterfall:
@@ -180,8 +171,7 @@ ivr-system/
 │   │   ├── host.json                    # Functions runtime config
 │   │   ├── local.settings.json          # Local dev connection strings
 │   │   ├── Functions/
-│   │   │   ├── IncomingCallHandler.cs   # Event Grid trigger (call entry point)
-│   │   │   └── CallbackHandler.cs       # HTTP callback (call event handler)
+   │   │   └── TeamsCallBot.cs          # HTTP trigger (all Teams calling events)
 │   │   └── Services/
 │   │       ├── CallFlowEngine.cs        # Menu resolution, conditions, input processing
 │   │       ├── AniAliService.cs         # ANI/ALI lookup + phone normalization
@@ -209,7 +199,7 @@ ivr-system/
 │   ├── modules/
 │   │   ├── cosmos-db.bicep              # Cosmos DB account + 10 containers
 │   │   ├── storage.bicep                # Storage account + blob containers
-│   │   ├── communication-services.bicep # ACS resource
+│   │   ├── communication-services.bicep # Bot/Teams service settings
 │   │   ├── cognitive-services.bicep     # Speech Services
 │   │   ├── openai.bicep                 # Azure OpenAI + GPT-4o deployment
 │   │   ├── function-app.bicep           # Function App + plan + settings
@@ -231,8 +221,8 @@ ivr-system/
 
 | Service | Purpose | SKU/Tier |
 |---|---|---|
-| **Azure Communication Services** | PSTN phone numbers, call control (answer, transfer, hang up), DTMF/speech recognition | Pay-as-you-go |
-| **Azure Functions** | Serverless compute for IVR engine; Event Grid + HTTP triggers | Consumption plan (.NET 8 isolated) |
+| **Microsoft Teams Phone System** | PSTN call reception via Direct Routing; Microsoft Graph Calling API for call control | Included with Teams license |
+| **Azure Functions** | Serverless compute for IVR engine; HTTP trigger at `/api/bot-messages` | Consumption plan (.NET 8 isolated) |
 | **Azure Cosmos DB** | NoSQL database for all configuration and call data | Serverless |
 | **Azure Blob Storage** | Audio file storage for recorded prompts | Standard LRS |
 | **Azure Cognitive Services** | Speech-to-text for real-time call transcription | S0 |
@@ -240,7 +230,6 @@ ivr-system/
 | **Azure App Service** | Hosts the Blazor Server admin portal | B1 or higher |
 | **Azure AD (Entra ID)** | Authentication for admin portal (role-based) | Included |
 | **Application Insights** | Telemetry, logging, and monitoring | Pay-as-you-go |
-| **Azure Event Grid** | Event-driven trigger for incoming calls | Pay-per-event |
 
 ---
 

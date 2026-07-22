@@ -17,26 +17,26 @@ The **IVR Function App** is the automated call handling engine that powers the E
 │  Phone Call Flow (Fully Automated)                          │
 ├─────────────────────────────────────────────────────────────┤
 │                                                              │
-│  1. 📞 Caller dials phone number                            │
+│  1. 📞 Caller dials phone number (Teams Direct Routing)     │
 │            ↓                                                 │
-│  2. 📡 Azure Communication Services receives call           │
+│  2. 📡 Microsoft Teams Phone System receives call           │
 │            ↓                                                 │
-│  3. 🔔 Event Grid → IncomingCallHandler Function            │
+│  3. 🔔 Graph commsNotification → TeamsCallBot Function      │
 │            ↓                                                 │
 │  4. 🤖 Function App automatically:                          │
 │       • Looks up ANI/ALI (caller identification/location)   │
 │       • Checks if caller is blocked                         │
-│       • Answers call                                        │
-│       • Plays greeting prompt                               │
+│       • Answers call via Microsoft Graph Calling API        │
+│       • Plays greeting prompt (TTS via Cognitive Services)  │
 │            ↓                                                 │
 │  5. 👤 Caller provides input (DTMF or voice)                │
 │            ↓                                                 │
-│  6. 🔔 ACS Callback → CallbackHandler Function              │
+│  6. 🔔 Graph commsNotification → TeamsCallBot Function      │
 │            ↓                                                 │
 │  7. 🤖 Function App processes input:                        │
 │       • Navigates menu hierarchy                            │
 │       • Plays next prompt                                   │
-│       • OR transfers to Teams queue                         │
+│       • OR transfers to Teams VDN / external number         │
 │       • OR sends data to external system                    │
 │       • Logs all activity                                   │
 │            ↓                                                 │
@@ -47,122 +47,73 @@ The **IVR Function App** is the automated call handling engine that powers the E
 
 ## Function Endpoints
 
-The Function App exposes two HTTP-triggered functions that are called exclusively by Azure services:
+The Function App exposes a single HTTP-triggered function that receives all Microsoft Graph calling notifications:
 
-### 1. IncomingCallHandler
+### TeamsCallBot
 
-**Endpoint**: `POST /api/incoming-call`  
-**Trigger Source**: Azure Event Grid  
-**Event Type**: `Microsoft.Communication.IncomingCall`
+**Endpoint**: `POST /api/bot-messages`  
+**Trigger Source**: Microsoft Graph Calling API (commsNotifications)  
+**Notification Types**:
+- `microsoft.graph.call` (incoming call)
+- `microsoft.graph.callRecord`
 
 #### Purpose
-Entry point for all inbound calls to the IVR system. This function is triggered when a call arrives at Azure Communication Services.
+Single entry point for all Teams calling events. Microsoft Graph sends a `commsNotification` POST to this endpoint for every call lifecycle event.
 
 #### Process Flow
 
 ```csharp
-1. Receive Event Grid notification
-2. Extract caller and called phone numbers
-   - Native ACS: from.phoneNumber.value
-   - SIP/Direct Routing: from.rawId (SIP URI parsing)
-3. Perform ANI/ALI lookup
-   - ANI: Automatic Number Identification (caller ID + metadata)
-   - ALI: Automatic Location Identification (caller address)
-4. Security check: Is caller blocked?
-   - YES → Reject call immediately
-   - NO → Continue
-5. Create CallLog record in Cosmos DB
-6. Answer the call via Call Automation SDK
-7. Configure callback URL: /api/callbacks/{callId}
-8. Enable Cognitive Services for speech recognition
-9. Determine root menu based on:
-   - Called DID (phone number)
-   - Caller VIP status
-   - Business hours
-   - Custom routing rules
-```
+1. Receive commsNotification from Microsoft Graph
+2. Authenticate: validate MicrosoftAppId / MicrosoftAppPassword
+3. Parse notification type:
 
-#### Code Location
-`src/IVR.Functions/Functions/IncomingCallHandler.cs`
+   ┌─ Incoming Call ────────────────────────────┐
+   │  • Extract caller and called numbers       │
+   │  • Perform ANI/ALI lookup                  │
+   │  • Security check (blocked caller)         │
+   │  • Create CallLog in Cosmos DB             │
+   │  • Answer call via Graph PATCH /calls/{id} │
+   │  • Determine root menu (per-DID, VIP,      │
+   │    business hours, conditions)             │
+   └────────────────────────────────────────────┘
 
-#### Key Features
-- **Multi-tenancy support**: Different menus for different phone numbers
-- **Caller identification**: ANI/ALI database lookup
-- **Access control**: Blocked caller rejection
-- **SIP compatibility**: Handles Direct Routing and SIP trunks
-- **Event Grid validation**: Responds to subscription validation events
-
----
-
-### 2. CallbackHandler
-
-**Endpoint**: `POST /api/callbacks/{callId}`  
-**Trigger Source**: Azure Communication Services (Call Automation)  
-**Event Types**: 
-- `CallConnected`
-- `RecognizeCompleted` (DTMF or speech input)
-- `RecognizeFailed`
-- `PlayCompleted`
-- `PlayFailed`
-- `CallDisconnected`
-
-#### Purpose
-Handles all mid-call events and drives the interactive menu navigation.
-
-#### Process Flow
-
-```csharp
-1. Receive CloudEvent from ACS Call Automation
-2. Parse event type
-3. Route to appropriate handler:
-
-   ┌─ CallConnected ────────────────────────────┐
+   ┌─ Call Established ─────────────────────────┐
    │  • Start menu navigation                   │
-   │  • Play welcome prompt                     │
+   │  • Play welcome prompt (TTS SAS URL)       │
    │  • Begin DTMF/speech recognition           │
    └────────────────────────────────────────────┘
 
-   ┌─ RecognizeCompleted ───────────────────────┐
-   │  • Extract DTMF keys or speech transcript  │
-   │  • Process menu selection                  │
-   │  • Execute action:                         │
-   │    - Navigate to submenu                   │
-   │    - Transfer to Teams queue               │
-   │    - Send data to external system          │
-   │    - Play information and return           │
-   │  • Update call log with navigation path    │
+   ┌─ Tone Received (DTMF) ─────────────────────┐
+   │  • Match tone to MenuOption.DtmfKey        │
+   │  • Execute action (navigate / transfer /   │
+   │    webhook / external system)              │
+   │  • Update call log with menu path          │
    └────────────────────────────────────────────┘
 
-   ┌─ RecognizeFailed ──────────────────────────┐
-   │  • Handle timeout or invalid input         │
-   │  • Increment retry counter                 │
-   │  • Play error prompt                       │
-   │  • Retry or execute fallback action        │
+   ┌─ Recording / Speech ───────────────────────┐
+   │  • Extract transcript from clientContext   │
+   │  • Classify with Azure OpenAI              │
+   │  • Route to matched team                   │
    └────────────────────────────────────────────┘
 
-   ┌─ PlayCompleted/PlayFailed ─────────────────┐
-   │  • Log prompt playback status              │
-   │  • Continue call flow if needed            │
-   └────────────────────────────────────────────┘
-
-   ┌─ CallDisconnected ─────────────────────────┐
-   │  • Update call log with end time           │
-   │  • Set final call status                   │
-   │  • Clean up in-memory state                │
+   ┌─ Call Terminated ──────────────────────────┐
+   │  • Update call log (end time, disposition) │
+   │  • Clean up in-memory call state           │
    └────────────────────────────────────────────┘
 ```
 
 #### Code Location
-`src/IVR.Functions/Functions/CallbackHandler.cs`
+`src/IVR.Functions/Functions/TeamsCallBot.cs`
 
 #### Key Features
+- **Single endpoint**: All call events arrive at `/api/bot-messages`
 - **Multi-level menu navigation**: Unlimited menu depth
 - **DTMF input processing**: Standard touchtone keypad
-- **Speech recognition**: Natural language input with transcription
+- **Speech recognition**: Natural language input via Teams record operation
 - **AI-powered routing**: Azure OpenAI intent classification (optional)
 - **Retry logic**: Configurable timeout and invalid input handling
 - **External integrations**: HTTP webhooks to fire alarm panels, CAD systems, etc.
-- **Teams routing**: Transfer calls to specific Teams call queues
+- **Teams VDN transfer**: Transfer calls to VDN addresses via Microsoft Graph
 - **Data extraction**: Collect caller input and push to external systems
 
 ---
@@ -336,14 +287,18 @@ The Function App reads configuration from multiple sources:
 
 | Setting | Purpose |
 |---------|---------|
-| `ACS_CONNECTION_STRING` | Azure Communication Services credential |
+| `MicrosoftAppId` | Teams Bot Application (Client) ID |
+| `MicrosoftAppPassword` | Teams Bot client secret |
+| `MicrosoftAppTenantId` | Azure AD tenant ID |
+| `GraphApiEndpoint` | Microsoft Graph endpoint (real or simulator) |
+| `ChannelService` | Bot Framework channel service URL (Gov: `https://botframework.azure.us`) |
 | `CosmosDbConnectionString` | Cosmos DB access |
 | `StorageConnectionString` | Blob Storage for audio files |
-| `CognitiveServicesEndpoint` | Speech-to-text / text-to-speech |
+| `CognitiveServicesEndpoint` | Text-to-speech synthesis |
+| `CognitiveServicesKey` | Cognitive Services authentication key |
 | `AzureOpenAIEndpoint` | GPT-4 for intent classification |
 | `AzureOpenAIKey` | OpenAI authentication |
 | `AzureOpenAIDeploymentName` | Model deployment ID |
-| `CallbackBaseUrl` | Function App base URL for callbacks |
 | `APPLICATIONINSIGHTS_CONNECTION_STRING` | Telemetry and monitoring |
 
 ---
@@ -479,11 +434,10 @@ Logs include TTL (90 days) for automatic cleanup.
 ### Azure Resources Required
 
 - **Azure Functions** (Consumption or Premium plan)
-- **Azure Communication Services** (with phone numbers or SIP configuration)
-- **Azure Event Grid** (subscription to ACS incoming call events)
+- **Microsoft Teams Phone System** (Direct Routing configured with SBC)
 - **Azure Cosmos DB** (serverless recommended for dev/test)
 - **Azure Blob Storage** (for audio prompt files)
-- **Azure Cognitive Services** (Speech API)
+- **Azure Cognitive Services** (Speech TTS)
 - **Azure OpenAI** (optional, for AI routing)
 - **Application Insights** (monitoring and diagnostics)
 
@@ -510,8 +464,8 @@ Logs include TTL (90 days) for automatic cleanup.
 
 For Azure Government cloud:
 - Use `AzureUSGovernment` endpoints
-- Set `dataLocation: 'usgov'` for Azure Communication Services
 - Use `https://login.microsoftonline.us` for authentication
+- Use `https://botframework.azure.us` as the channel service
 - Ensure all services are available in Gov regions (some features limited)
 
 **Note**: Azure OpenAI may have limited model availability in Azure Government. The system falls back to DTMF-only navigation if OpenAI is not configured.
@@ -558,10 +512,10 @@ customEvents
 ### Common Issues
 
 **1. Calls not being answered**
-- Check Event Grid subscription is active
-- Verify `ACS_CONNECTION_STRING` is set
+- Verify `MicrosoftAppId` and `MicrosoftAppPassword` are set correctly
+- Confirm `GraphApiEndpoint` points to the correct endpoint (real or simulator)
 - Confirm Function App is running (not stopped)
-- Review logs for exceptions in IncomingCallHandler
+- Review logs for exceptions in TeamsCallBot
 
 **2. DTMF not recognized**
 - Ensure `RecognizeCompleted` events are received
@@ -710,5 +664,5 @@ Test end-to-end call flows:
 
 - [Architecture Documentation](architecture.md) - Complete system design
 - [Admin Portal Guide](admin-portal.md) - Configure menus and prompts
-- [Azure Communication Services Docs](https://learn.microsoft.com/azure/communication-services/)
+- [Microsoft Graph Calling API Docs](https://learn.microsoft.com/graph/api/resources/communications-api-overview)
 - [Azure Functions Best Practices](https://learn.microsoft.com/azure/azure-functions/functions-best-practices)

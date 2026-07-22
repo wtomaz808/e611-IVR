@@ -82,7 +82,6 @@ az deployment group create \
 This deploys:
 - ✅ Cosmos DB (serverless) with containers
 - ✅ Storage Account for prompts and function storage
-- ✅ Azure Communication Services
 - ✅ Cognitive Services (Speech TTS/STT)
 - ✅ Azure OpenAI (GPT-4.1)
 - ✅ Function App (IVR engine)
@@ -183,32 +182,6 @@ This seeds:
 - Sample menus (main menu, after-hours, VIP flow)
 - Sample ANI/ALI records
 - Sample team routing configuration
-
-### Step 8: Configure Event Grid (Optional)
-
-If using actual Azure Communication Services phone numbers:
-
-```bash
-# Get function app endpoint
-FUNCTION_ENDPOINT=$(az deployment group show \
-  --resource-group rg-ivr-dev \
-  --name main \
-  --query properties.outputs.functionAppUrl.value -o tsv)
-
-# Get ACS resource ID
-ACS_RESOURCE_ID=$(az deployment group show \
-  --resource-group rg-ivr-dev \
-  --name main \
-  --query properties.outputs.acsResourceId.value -o tsv)
-
-# Create Event Grid subscription for incoming calls
-az eventgrid event-subscription create \
-  --name ivr-incoming-calls \
-  --source-resource-id $ACS_RESOURCE_ID \
-  --endpoint "https://$FUNCTION_ENDPOINT/api/IncomingCallHandler" \
-  --endpoint-type webhook \
-  --included-event-types Microsoft.Communication.IncomingCall
-```
 
 ## Post-Deployment Verification
 

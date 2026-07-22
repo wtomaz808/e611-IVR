@@ -308,7 +308,7 @@ Type a phone number, name, or account number in the search box to filter records
 When a caller has VIP enabled and a Custom Routing Menu ID is set, they bypass the normal menu tree and go directly to their personalized menu.
 
 #### Blocking a Caller
-Check the **Blocked** flag to automatically reject calls from this number. The call will be rejected immediately at the `IncomingCallHandler` stage — no call log is created and no prompts are played.
+Check the **Blocked** flag to automatically reject calls from this number. The call will be rejected immediately at the `TeamsCallBot` stage — no call log is created and no prompts are played.
 
 ### ALI Records Tab
 
@@ -411,7 +411,7 @@ Structured fields extracted from the transcript by AI (e.g., `action: "test"`, `
 
 **Route**: `/phone-numbers`
 
-Manage the inventory of phone numbers (DIDs) that route into the IVR. Each number can be an ACS-native number, a direct-routed number through an SBC, or a SIP trunk number.
+Manage the inventory of phone numbers (DIDs) that route into the IVR. Each number maps to a root menu and can override business hours and welcome prompts.
 
 ### Phone Numbers Table
 
@@ -419,9 +419,8 @@ Manage the inventory of phone numbers (DIDs) that route into the IVR. Each numbe
 |---|---|
 | Phone Number | E.164 formatted phone number |
 | Label | Descriptive name (e.g., "Main Support Line") |
-| Type | `NativeAcs`, `DirectRouting`, or `SipTrunk` |
+| Type | `TeamsDirectRouting` or `External` |
 | Root Menu | The IVR menu callers on this number enter |
-| SBC | FQDN of the Session Border Controller (if applicable) |
 | Active | Whether the number is receiving calls |
 
 ### Adding a Phone Number
@@ -430,13 +429,11 @@ Manage the inventory of phone numbers (DIDs) that route into the IVR. Each numbe
 2. Enter the phone number in E.164 format (e.g., `+15551234567`).
 3. Enter a descriptive label.
 4. Select the **Number Type**:
-   - `NativeAcs` — number purchased inside Azure Communication Services
-   - `DirectRouting` — customer-owned number routed via SBC
-   - `SipTrunk` — number from a third-party SIP trunk provider
+   - `TeamsDirectRouting` — number provisioned in Microsoft Teams Phone System via Direct Routing
+   - `External` — externally managed number (SIP trunk or third-party carrier)
 5. Select the **Root Menu** this number should drop callers into. If left blank, the system-wide root menu is used.
 6. (Optional) Select per-number **Business Hours** and **Welcome Prompt** overrides.
-7. For direct routing or SIP trunk: enter the **SBC FQDN** and **Port**.
-8. Click **Save**.
+7. Click **Save**.
 
 ### Called-Number Aliases
 
@@ -465,7 +462,7 @@ Toggle the **Active** switch to deactivate a number. Calls to deactivated number
 | Emergency Menu ID | ID of the emergency routing menu |
 | Global Timeout (seconds) | Default input timeout (default: 15) |
 | Global Max Retries | Default retry count (default: 3) |
-| PSTN Mode | `NativeAcs`, `DirectRouting`, or `Hybrid` |
+| PSTN Mode | `TeamsDirectRouting` or `Hybrid` |
 | Default SBC FQDN | Default Session Border Controller hostname (for direct routing) |
 | Default SBC Port | Default SIP signaling port (default: 5067) |
 
@@ -610,22 +607,20 @@ See [System Integration Guide](system-integration.md) for detailed configuration
 
 ### Task: Add an Existing PSTN Number (Direct Routing)
 
-1. Ensure your SBC is registered with Azure Communication Services (see [PSTN Connectivity](system-integration.md#5-pstn-connectivity)).
+1. Ensure your SBC is registered with Microsoft Teams Phone System for Direct Routing (see [PSTN Connectivity](system-integration.md#5-pstn-connectivity)).
 2. Go to **Phone Numbers** > click **Add Phone Number**.
 3. Enter the number in E.164 format (e.g., `+15551234567`).
-4. Set **Number Type** to `DirectRouting`.
-5. Enter the **SBC FQDN** (e.g., `sbc.contoso.com`) and **Port** (default: `5067`).
-6. Select (or create) a **Root Menu** for this number — or leave blank to use the system-wide root menu.
-7. Click **Save**.
-8. Go to **Settings** > **General** and set **PSTN Mode** to `DirectRouting` or `Hybrid`.
-9. Test by calling the number and verifying the correct IVR menu plays.
+4. Set **Number Type** to `TeamsDirectRouting`.
+5. Select (or create) a **Root Menu** for this number — or leave blank to use the system-wide root menu.
+6. Click **Save**.
+7. Go to **Settings** > **General** and set **PSTN Mode** to `TeamsDirectRouting`.
+8. Test by calling the number and verifying the correct IVR menu plays.
 
-### Task: Configure Avaya CM10 VDN Transfer on Disconnect
+### Task: Configure VDN Transfer on Disconnect
 
-1. Ensure your Avaya SBC is registered with Azure Communication Services.
-2. In Avaya CM10, create VDNs and call vectors for post-IVR ACD routing.
-3. Go to **Settings** > **Avaya CM10 Integration**.
-4. Check **Transfer to VDN on Disconnect**.
+1. Ensure your SBC is correctly routing to the target VDN.
+2. Go to **Settings** > **Avaya CM10 Integration**.
+3. Check **Transfer to VDN on Disconnect**.
 5. Enter the **Default CM10 VDN** — either a SIP URI (`sip:70100@sbc.contoso.com`) or an E.164 number (`+18005550100`).
 6. Enter the **CM10 SBC FQDN** if it differs from the main SBC.
 7. Optionally set a **Transfer Prompt** to play before the handoff (e.g., "Please hold while we connect you.").

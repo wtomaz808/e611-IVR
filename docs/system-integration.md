@@ -11,7 +11,7 @@ This document covers every integration point in the IVR system: AI-powered trans
 3. [Webhook Actions](#3-webhook-actions)
 4. [ANI/ALI Data Integration](#4-aniali-data-integration)
 5. [PSTN Connectivity](#5-pstn-connectivity)
-6. [Azure Communication Services](#6-azure-communication-services)
+6. [Microsoft Teams Graph Calling API](#6-microsoft-teams-graph-calling-api)
 7. [Azure OpenAI Integration](#7-azure-openai-integration)
 8. [Configuration Reference](#8-configuration-reference)
 
@@ -507,32 +507,23 @@ All phone numbers are normalized to **E.164 format** before lookup. The `AniAliS
 
 ### Overview
 
-The system supports three PSTN connection modes, configured via `SystemConfig.PstnMode`:
+The system uses Microsoft Teams Phone System with Direct Routing. Phone numbers are provisioned in Teams and routed to the IVR via the Microsoft Graph Calling API. Each DID can have its own menu tree, business hours, and welcome prompt.
 
 | Mode | Description | Use Case |
 |---|---|---|
-| **NativeAcs** | Phone numbers purchased inside Azure Communication Services | New deployments with no existing telephony infrastructure |
-| **DirectRouting** | Existing PSTN numbers routed through a customer-owned Session Border Controller (SBC) into ACS | Organizations with existing PBX/SBC infrastructure and carrier contracts |
-| **Hybrid** | Mix of ACS-native and direct-routed numbers on the same IVR deployment | Phased migration or multi-site deployments |
+| **TeamsDirectRouting** | PSTN numbers provisioned in Microsoft Teams via Direct Routing (SBC) | Organizations using Teams Phone System |
+| **External** | Externally managed numbers (third-party SIP trunk or carrier) | Legacy or hybrid carrier arrangements |
 
-### Architecture — Direct Routing
+### Architecture — Teams Direct Routing
 
 ```
   Caller
     │
     ▼
-┌──────────┐    SIP INVITE    ┌──────────────────┐   REST/WS    ┌──────────────┐
-│  PSTN    │ ─────────────►  │  Session Border   │ ──────────► │ Azure Comm.  │
-│  Carrier │                  │  Controller (SBC) │              │ Services     │
-└──────────┘                  └──────────────────┘              └──────┬───────┘
-                                                                       │
-                                                            Event Grid │
-                                                                       ▼
-                                                             ┌──────────────────┐
-                                                             │ IVR Functions    │
-                                                             │ (IncomingCall    │
-                                                             │  Handler)        │
-                                                             └──────────────────┘
+┌──────────┐  SIP INVITE  ┌──────────────────┐ commsNotification  ┌──────────────┐
+│  PSTN    │ ──────────►  │  Session Border   │ ────────────────► │ IVR Functions│
+│  Carrier │              │  Controller (SBC) │                    │ TeamsCallBot │
+└──────────┘              └──────────────────┘                    └──────────────┘
 ```
 
 ### PhoneNumberConfig Model
@@ -544,7 +535,7 @@ Each phone number (DID) in the system has a `PhoneNumberConfig` document stored 
   "id": "pn-001",
   "phoneNumber": "+15551234567",
   "label": "Main Support Line",
-  "numberType": "DirectRouting",
+  "numberType": "TeamsDirectRouting",
   "rootMenuId": "menu-support-root",
   "businessHoursConfigId": "bh-support",
   "welcomePromptId": "prompt-welcome-support",
@@ -560,7 +551,7 @@ Each phone number (DID) in the system has a `PhoneNumberConfig` document stored 
 |---|---|---|
 | `phoneNumber` | string | E.164 phone number |
 | `label` | string | Human-readable name (e.g., "Main Line") |
-| `numberType` | enum | `NativeAcs`, `DirectRouting`, or `SipTrunk` |
+| `numberType` | enum | `TeamsDirectRouting` or `External` |
 | `rootMenuId` | string? | Per-DID root menu (overrides system-wide root) |
 | `businessHoursConfigId` | string? | Per-DID business hours override |
 | `welcomePromptId` | string? | Welcome prompt before root menu |
@@ -582,10 +573,7 @@ This allows multiple phone numbers to share one IVR deployment, each with a diff
 
 ### SIP URI Handling
 
-For direct-routed calls, ACS provides caller/called identifiers as SIP URIs rather than plain phone numbers. The `IncomingCallHandler` extracts the phone number using a two-step fallback:
-
-1. Try `participant.phoneNumber.value` (ACS-native format)
-2. Fall back to `participant.rawId` and parse with `AniAliService.ExtractPhoneFromUri()`
+For direct-routed calls, Teams provides caller/called identifiers as SIP URIs. The `TeamsCallBot` extracts the phone number using `AniAliService.ExtractPhoneFromUri()`.
 
 Supported URI formats:
 
@@ -602,7 +590,7 @@ The `SystemConfig` document includes system-wide PSTN defaults:
 
 | Field | Type | Default | Description |
 |---|---|---|---|
-| `pstnMode` | `PstnMode` enum | `NativeAcs` | `NativeAcs`, `DirectRouting`, or `Hybrid` |
+| `pstnMode` | `PstnMode` enum | `TeamsDirectRouting` | `TeamsDirectRouting` or `Hybrid` |
 | `defaultSbcFqdn` | string? | `null` | Default SBC FQDN (overridden per-number) |
 | `defaultSbcPort` | int | `5067` | Default SIP signaling port |
 | `enableDisconnectTransferToVdn` | bool | `false` | Forward caller disconnects to the CM10 VDN |
@@ -618,7 +606,7 @@ The `SystemConfig` document includes system-wide PSTN defaults:
 3. **Configure voice routes** — create voice routing policies in ACS matching the phone number patterns you want to receive.
 4. **Create PhoneNumberConfig** — add a document in Cosmos DB for each DID, specifying `numberType: "DirectRouting"` and the SBC FQDN.
 5. **Set PstnMode** — update `SystemConfig.PstnMode` to `DirectRouting` or `Hybrid`.
-6. **Test** — place a call to the DID. The `IncomingCallHandler` will parse the SIP URI, look up the `PhoneNumberConfig`, and route to the correct menu.
+6. **Test** — place a call to the DID. The `TeamsCallBot` will parse the notification, look up the `PhoneNumberConfig`, and route to the correct menu.
 
 ### Avaya CM10 VDN Integration
 
@@ -694,34 +682,38 @@ The system resolves the target VDN in this order:
 
 ---
 
-## 6. Azure Communication Services
+## 6. Microsoft Teams Graph Calling API
 
 ### Call Control Operations
 
-The IVR uses the ACS **Call Automation SDK** for:
+The IVR uses the **Microsoft Graph Calling API** for all call control:
 
-| Operation | SDK Method | Usage |
+| Operation | Graph API Call | Usage |
 |---|---|---|
-| Answer call | `AnswerCallAsync` | IncomingCallHandler — answers with callback URL |
-| Reject call | `RejectCallAsync` | IncomingCallHandler — rejects blocked callers |
-| Play audio | `PlayToAllAsync` | Plays TTS, audio files, or SSML prompts |
-| Collect DTMF | `StartRecognizingAsync` (DTMF) | Standard menus — collects touch-tone digits |
-| Collect speech | `StartRecognizingAsync` (Speech) | Speech menus — captures spoken words |
-| Transfer call | `TransferCallToParticipantAsync` | Routes to external numbers, teams, or CM10 VDNs |
-| Hang up | `HangUpAsync` | Terminates the call |
+| Answer call | `PATCH /communications/calls/{callId}` | TeamsCallBot — answers incoming call |
+| Reject call | `DELETE /communications/calls/{callId}` | TeamsCallBot — rejects blocked callers |
+| Play audio | `POST /communications/calls/{callId}/playPrompt` | Plays TTS audio (SAS URL from Blob Storage) |
+| Subscribe to tones | `POST /communications/calls/{callId}/subscribeToTone` | Collect DTMF after prompt completes |
+| Record speech | `POST /communications/calls/{callId}/record` | Capture spoken words for AI routing |
+| Transfer call | `POST /communications/calls/{callId}/transfer` | Routes to VDN address or external number |
+| Hang up | `DELETE /communications/calls/{callId}` | Terminates the call |
 
-### Callback Flow
+### Notification Flow
 
-ACS sends call events to the callback URL registered during `AnswerCallAsync`:
+Microsoft Graph sends call events as HTTP POST `commsNotifications` to the bot endpoint:
 
 ```
-POST /api/callbacks/{callId}
-Content-Type: application/cloudevents+json
+POST /api/bot-messages
+Content-Type: application/json
 
-[CloudEvent with CallConnected | RecognizeCompleted | PlayCompleted | etc.]
+{ "value": [{ "subscriptionId": "...", "changeType": "updated",
+  "resource": "/communications/calls/{callId}",
+  "resourceData": { ... } }] }
 ```
 
-The `CallbackHandler` function parses these CloudEvents and dispatches to the appropriate handler.
+The `TeamsCallBot` function parses the notification and dispatches to the appropriate handler.
+
+The `TeamsCallBot` function parses these notifications and dispatches to the appropriate handler.
 
 ---
 
@@ -763,10 +755,13 @@ new AzureOpenAIClient(new Uri(endpoint), new DefaultAzureCredential());
 
 | Variable | Required | Description |
 |---|---|---|
-| `AcsConnectionString` | Yes | Azure Communication Services connection string |
+| `MicrosoftAppId` | Yes | Teams Bot Application (Client) ID |
+| `MicrosoftAppPassword` | Yes | Teams Bot client secret |
+| `MicrosoftAppTenantId` | Yes | Azure AD tenant ID |
+| `GraphApiEndpoint` | Yes | Microsoft Graph endpoint (real or simulator) |
+| `ChannelService` | Yes | Bot Framework channel service URL |
 | `CosmosDbConnectionString` | Yes | Cosmos DB connection string |
 | `StorageConnectionString` | Yes | Azure Blob Storage connection string |
-| `CallbackBaseUrl` | Yes | Public URL of the Function App (e.g., `https://ivr-func.azurewebsites.net`) |
 | `CognitiveServicesEndpoint` | Yes | Azure Cognitive Services Speech endpoint URL |
 | `CognitiveServicesKey` | No | Cognitive Services key (uses managed identity if absent) |
 | `AzureOpenAI:Endpoint` | Yes | Azure OpenAI endpoint URL |
@@ -790,13 +785,11 @@ new AzureOpenAIClient(new Uri(endpoint), new DefaultAzureCredential());
 
 ## Testing with the PSTN Simulator
 
-For end-to-end testing of CM10 VDN transfers, team routing, and external system integrations without real telephony hardware, use the [PSTN & CM10 Simulator](pstn-simulator.md).
+For end-to-end testing of VDN transfers, team routing, and external system integrations without real telephony hardware, use the [PSTN Simulator](pstn-simulator.md).
 
 The simulator provides:
 
-- **Mock ACS mode** — Fake ACS REST API, no Azure required
+- **Mock Teams Graph API** — Fake Microsoft Graph Calling API, no Azure required
 - **CM10 engine** — Simulated VDNs, vectors, ACD queues, and agents
-- **DTMF/Speech input** — Test all recognize types from the browser
+- **DTMF input** — Test all tone inputs from the browser
 - **Transfer tracking** — Watch calls flow from IVR → CM10 → Agent
-
-See also: [CM10 Setup Guide](cm10-setup-guide.md) for physical Avaya CM10 configuration.

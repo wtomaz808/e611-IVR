@@ -44,7 +44,7 @@ This document outlines a strategic approach to modernize the E911 IVR system by 
 │ Current E911 IVR Architecture (Function-Based)               │
 └──────────────────────────────────────────────────────────────┘
 
-Call → ACS → Azure Function → GPT-4.1 API → Response
+Call → Teams Phone System → Azure Function → GPT-4.1 API → Response
                 ↓
          Direct function calls
          (ANI lookup, routing, etc.)
@@ -54,7 +54,7 @@ Call → ACS → Azure Function → GPT-4.1 API → Response
 
 | Component | Technology | Purpose | Latency |
 |-----------|-----------|---------|---------|
-| **Telephony** | Azure Communication Services | Direct Routing, call handling | 50-100ms |
+| **Telephony** | Microsoft Teams Phone System | Direct Routing, call handling | 50-100ms |
 | **Orchestration** | Azure Functions (C#) | Event handling, business logic | 100-200ms |
 | **AI** | Azure OpenAI GPT-4.1 | Natural language understanding | 500-1500ms |
 | **Speech** | Azure AI Speech | STT/TTS conversion | 200-500ms |
@@ -66,20 +66,20 @@ Call → ACS → Azure Function → GPT-4.1 API → Response
 ```mermaid
 sequenceDiagram
     participant Caller
-    participant ACS as Azure Communication Services
+    participant Teams as Microsoft Teams Phone System
     participant Func as Azure Function
     participant GPT as GPT-4.1
     participant DB as ANI/ALI Database
     participant Cosmos as Cosmos DB
 
-    Caller->>ACS: Dial 911
-    ACS->>Func: IncomingCall event
+    Caller->>Teams: Dial 911
+    Teams->>Func: commsNotification (incoming)
     Func->>DB: Lookup ANI/ALI
     DB-->>Func: Location data
     Func->>GPT: Analyze speech input
     GPT-->>Func: Emergency type + urgency
     Func->>Func: Determine routing
-    Func->>ACS: Route to emergency team
+    Func->>Teams: Route to emergency team
     Func->>Cosmos: Save call record
 ```
 
@@ -383,11 +383,7 @@ server.listen({ port: 3000 });
 graph TB
     subgraph "Telephony Layer"
         Call[Incoming Call]
-        ACS[Azure Communication Services]
-    end
-    
-    subgraph "Orchestration Layer"
-        Func[Azure Functions<br/>Thin wrapper]
+        Teams[Microsoft Teams Phone System]
     end
     
     subgraph "NEW: Agent Layer"
@@ -529,7 +525,7 @@ public class EmergencyResponseAgent : Agent
 graph TB
     subgraph "Entry Point"
         Call[Incoming Call]
-        ACS[Azure Communication Services]
+        Teams[Microsoft Teams Phone System]
     end
     
     subgraph "Decision Router"
