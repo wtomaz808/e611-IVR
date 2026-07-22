@@ -419,8 +419,25 @@ public class TeamsCallBot
         var menu = currentMenuId is not null
             ? await _cosmosDb.GetMenuAsync(currentMenuId) : null;
 
-        // Retrieve the pre-saved transcript if any (speech was captured from pending metadata)
-        var transcript = callLog.Metadata.GetValueOrDefault(MetaPendingSpeech) ?? "";
+        // The simulator encodes the transcript in clientContext as "callId|transcript text".
+        // Extract it here and save into metadata so TranscriptRoutingService can use it.
+        string transcript = "";
+        if (data.TryGetProperty("clientContext", out var cc))
+        {
+            var ctx = cc.GetString() ?? "";
+            var sep = ctx.IndexOf('|');
+            if (sep >= 0)
+            {
+                transcript = ctx[(sep + 1)..];
+                if (!string.IsNullOrWhiteSpace(transcript))
+                {
+                    callLog.Metadata[MetaPendingSpeech] = transcript;
+                    await _cosmosDb.UpdateCallLogAsync(callLog);
+                }
+            }
+        }
+        if (string.IsNullOrWhiteSpace(transcript))
+            transcript = callLog.Metadata.GetValueOrDefault(MetaPendingSpeech) ?? "";
 
         if (string.IsNullOrWhiteSpace(transcript) || menu is null)
         {
@@ -522,6 +539,18 @@ public class TeamsCallBot
                         await PlayMenuAsync(callId, callLog, nextMenu);
                         return;
                     }
+                }
+                break;
+
+            case ActionType.TransferToVdn:
+                if (action.VdnAddress is not null)
+                {
+                    callLog.Status       = CallStatus.Transferred;
+                    callLog.TransferredTo = action.VdnAddress;
+                    callLog.Disposition  = CallDisposition.TransferredToExternal;
+                    await _cosmosDb.UpdateCallLogAsync(callLog);
+                    await GraphTransferAsync(callId, action.VdnAddress);
+                    return;
                 }
                 break;
 

@@ -22,8 +22,9 @@ public class BlobStorageService : IBlobStorageService
     {
         await _containerClient.CreateIfNotExistsAsync(PublicAccessType.None);
 
-        var blobName = $"{DateTime.UtcNow:yyyy/MM}/{Guid.NewGuid()}/{fileName}";
-        var blobClient = _containerClient.GetBlobClient(blobName);
+        // Use the caller-supplied name as the exact blob path so content-addressed
+        // callers (e.g. TtsGenerationService) can retrieve it by the same name.
+        var blobClient = _containerClient.GetBlobClient(fileName);
 
         var options = new BlobUploadOptions
         {
@@ -31,9 +32,9 @@ public class BlobStorageService : IBlobStorageService
         };
 
         await blobClient.UploadAsync(audioStream, options);
-        _logger.LogInformation("Uploaded audio file {BlobName}", blobName);
+        _logger.LogInformation("Uploaded audio file {BlobName}", fileName);
 
-        return blobName;
+        return fileName;
     }
 
     public async Task<Stream?> DownloadAudioAsync(string blobName)
@@ -61,8 +62,10 @@ public class BlobStorageService : IBlobStorageService
     {
         var blobClient = _containerClient.GetBlobClient(blobName);
 
+        // Return empty string on cache-miss so callers like TtsGenerationService
+        // can treat it as a cache miss rather than receiving an exception.
         if (!await blobClient.ExistsAsync())
-            throw new FileNotFoundException($"Audio file {blobName} not found");
+            return string.Empty;
 
         if (blobClient.CanGenerateSasUri)
         {

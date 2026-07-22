@@ -52,6 +52,9 @@ param openAIKey string
 @description('Azure OpenAI deployment name')
 param openAIDeploymentName string
 
+@description('Override the Graph API endpoint. Set to the PSTN simulator URL for simulator testing (e.g. https://my-simulator.azurewebsites.us/graph/v1.0). Empty string uses the cloud-default endpoint.')
+param graphApiEndpointOverride string = ''
+
 // ─── Cloud-specific Bot Framework endpoints ─────────────────────
 // Azure Government (GCC High) uses separate auth and channel service
 // endpoints. These are automatically selected based on the deployment
@@ -59,7 +62,8 @@ param openAIDeploymentName string
 var isGovCloud = environment().name == 'AzureUSGovernment'
 var channelService = isGovCloud ? 'https://botframework.azure.us' : ''
 var oAuthUrl = isGovCloud ? 'https://login.microsoftonline.us' : environment().authentication.loginEndpoint
-var graphApiEndpoint = isGovCloud ? 'https://graph.microsoft.us/v1.0' : 'https://graph.microsoft.com/v1.0'
+var defaultGraphApiEndpoint = isGovCloud ? 'https://graph.microsoft.us/v1.0' : 'https://graph.microsoft.com/v1.0'
+var graphApiEndpoint = !empty(graphApiEndpointOverride) ? graphApiEndpointOverride : defaultGraphApiEndpoint
 
 resource hostingPlan 'Microsoft.Web/serverfarms@2023-12-01' = {
   name: '${name}-plan'

@@ -41,11 +41,18 @@ public class TtsGenerationService
         _blobStorage = blobStorage;
         _logger = logger;
 
-        // Endpoint: {CognitiveServicesEndpoint}tts/cognitiveservices/v1
-        // Commercial: https://<custom>.cognitiveservices.azure.com/tts/cognitiveservices/v1
-        // Gov (GCC High): https://<custom>.cognitiveservices.azure.us/tts/cognitiveservices/v1
-        var baseEndpoint = configuration["CognitiveServicesEndpoint"]?.TrimEnd('/') ?? "";
-        _ttsEndpoint = $"{baseEndpoint}/tts/cognitiveservices/v1";
+        // Endpoint: https://<custom>.cognitiveservices.azure.{us|com}/tts/cognitiveservices/v1
+        // The ARM endpoint property for Speech resources often includes a path suffix
+        // (e.g. /sts/v1.0/issuetoken on Azure Gov). Strip to just scheme://host so we
+        // can append the correct /tts/cognitiveservices/v1 path.
+        var rawEndpoint = configuration["CognitiveServicesEndpoint"] ?? "";
+        string ttsBase;
+        if (!string.IsNullOrEmpty(rawEndpoint)
+            && Uri.TryCreate(rawEndpoint, UriKind.Absolute, out var parsedUri))
+            ttsBase = $"{parsedUri.Scheme}://{parsedUri.Host}";
+        else
+            ttsBase = rawEndpoint.TrimEnd('/');
+        _ttsEndpoint = $"{ttsBase}/tts/cognitiveservices/v1";
         _ttsApiKey = configuration["CognitiveServicesKey"] ?? "";
     }
 

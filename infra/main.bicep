@@ -32,6 +32,9 @@ param teamsBotAppPassword string
 @description('Deploy the Azure Bot Service resource via Bicep. Set false for Azure Government subscriptions where the ARM provider returns APS errors; create the bot manually in the portal instead.')
 param deployBotService bool = false
 
+@description('Override the Graph API endpoint used by the IVR Functions. Set to the PSTN simulator URL for simulator-based testing, e.g. https://<simulator-host>/graph/v1.0. Empty = use cloud default.')
+param simulatorGraphEndpoint string = ''
+
 // ─── Naming Convention ──────────────────────────────────────────
 var uniqueSuffix = uniqueString(resourceGroup().id)
 var namePrefix = '${baseName}-${environmentName}'
@@ -124,6 +127,7 @@ module functionApp 'modules/function-app.bicep' = {
     openAIEndpoint: openAI.outputs.endpoint
     openAIKey: openAI.outputs.primaryKey
     openAIDeploymentName: openAI.outputs.deploymentName
+    graphApiEndpointOverride: simulatorGraphEndpoint
   }
 }
 

@@ -1,5 +1,6 @@
 using System.Text;
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using PstnSimulator.Models;
 
 namespace PstnSimulator.Services;
@@ -114,7 +115,7 @@ public class MockTeamsBridge : IAcsBridge
             $"Teams recordOperation completed (transcript: \"{text}\")");
     }
 
-    /// <summary>Disconnect: send a terminated state notification.</summary>
+    /// <summary>Disconnect: send a terminated state notification and transition to Disconnected.</summary>
     public async Task DisconnectAsync(string callId)
     {
         var call = _callManager.GetCall(callId);
@@ -126,6 +127,9 @@ public class MockTeamsBridge : IAcsBridge
         var payload = BuildCallStateNotification(callId, "terminated");
         await PostToBotEndpointAsync(ivrEndpoint, payload, call,
             "Teams commsNotification (terminated)");
+
+        // Transition to Disconnected so the simulator UI clears the active call.
+        _callManager.TransitionCall(callId, CallState.Disconnected, CallEventSource.Pstn, "Caller disconnected");
     }
 
     // ════════════════════════════════════════════════════════════
@@ -280,111 +284,118 @@ public class MockTeamsBridge : IAcsBridge
     private static string BuildCallStateNotification(string callId, string state,
         string? callerNumber = null, string? calledNumber = null)
     {
-        object resourceData = callerNumber != null
-            ? new
+        var resourceData = new JsonObject
+        {
+            ["@odata.type"] = "#microsoft.graph.call",
+            ["id"]          = callId,
+            ["state"]       = state
+        };
+
+        if (callerNumber != null)
+        {
+            resourceData["direction"] = "incoming";
+            resourceData["requestedModalities"] = new JsonArray("audio");
+            resourceData["mediaConfig"] = new JsonObject
             {
-                @odatatype = "#microsoft.graph.call",
-                id = callId,
-                state,
-                direction = "incoming",
-                requestedModalities = new[] { "audio" },
-                mediaConfig = new { @odatatype = "#microsoft.graph.serviceHostedMediaConfig" },
-                source = new
+                ["@odata.type"] = "#microsoft.graph.serviceHostedMediaConfig"
+            };
+            resourceData["source"] = new JsonObject
+            {
+                ["@odata.type"] = "#microsoft.graph.participantInfo",
+                ["identity"]    = new JsonObject
                 {
-                    @odatatype = "#microsoft.graph.participantInfo",
-                    identity = new
+                    ["@odata.type"] = "#microsoft.graph.identitySet",
+                    ["phone"]       = new JsonObject
                     {
-                        @odatatype = "#microsoft.graph.identitySet",
-                        phone = new { @odatatype = "#microsoft.graph.identity", id = callerNumber }
+                        ["@odata.type"] = "#microsoft.graph.identity",
+                        ["id"]          = callerNumber
                     }
-                },
-                targets = new[]
+                }
+            };
+            resourceData["targets"] = new JsonArray(
+                new JsonObject
                 {
-                    new
+                    ["@odata.type"] = "#microsoft.graph.invitationParticipantInfo",
+                    ["identity"]    = new JsonObject
                     {
-                        @odatatype = "#microsoft.graph.invitationParticipantInfo",
-                        identity = new
+                        ["@odata.type"] = "#microsoft.graph.identitySet",
+                        ["phone"]       = new JsonObject
                         {
-                            @odatatype = "#microsoft.graph.identitySet",
-                            phone = new { @odatatype = "#microsoft.graph.identity", id = calledNumber }
+                            ["@odata.type"] = "#microsoft.graph.identity",
+                            ["id"]          = calledNumber
                         }
                     }
                 }
-            }
-            : (object)new
-            {
-                @odatatype = "#microsoft.graph.call",
-                id = callId,
-                state
-            };
+            );
+        }
 
-        return JsonSerializer.Serialize(new
+        var envelope = new JsonObject
         {
-            @odatatype = "#microsoft.graph.commsNotifications",
-            value = new[]
-            {
-                new
+            ["@odata.type"] = "#microsoft.graph.commsNotifications",
+            ["value"] = new JsonArray(
+                new JsonObject
                 {
-                    @odatatype   = "#microsoft.graph.commsNotification",
-                    changeType   = state == "incoming" ? "created" : "updated",
-                    resourceUrl  = $"/communications/calls/{callId}",
-                    resourceData
+                    ["@odata.type"]  = "#microsoft.graph.commsNotification",
+                    ["changeType"]   = state == "incoming" ? "created" : "updated",
+                    ["resourceUrl"]  = $"/communications/calls/{callId}",
+                    ["resourceData"] = resourceData
                 }
-            }
-        });
+            )
+        };
+        return envelope.ToJsonString();
     }
 
     private static string BuildToneNotification(string callId, string graphTone)
     {
-        return JsonSerializer.Serialize(new
+        var envelope = new JsonObject
         {
-            @odatatype = "#microsoft.graph.commsNotifications",
-            value = new[]
-            {
-                new
+            ["@odata.type"] = "#microsoft.graph.commsNotifications",
+            ["value"] = new JsonArray(
+                new JsonObject
                 {
-                    @odatatype   = "#microsoft.graph.commsNotification",
-                    changeType   = "updated",
-                    resourceUrl  = $"/communications/calls/{callId}",
-                    resourceData = new
+                    ["@odata.type"]  = "#microsoft.graph.commsNotification",
+                    ["changeType"]   = "updated",
+                    ["resourceUrl"]  = $"/communications/calls/{callId}",
+                    ["resourceData"] = new JsonObject
                     {
-                        @odatatype = "#microsoft.graph.call",
-                        id         = callId,
-                        state      = "established",
-                        toneInfo   = new
+                        ["@odata.type"] = "#microsoft.graph.call",
+                        ["id"]          = callId,
+                        ["state"]       = "established",
+                        ["toneInfo"]    = new JsonObject
                         {
-                            @odatatype = "#microsoft.graph.toneInfo",
-                            tone       = graphTone,
-                            sequenceId = 1
+                            ["@odata.type"] = "#microsoft.graph.toneInfo",
+                            ["tone"]        = graphTone,
+                            ["sequenceId"]  = 1
                         }
                     }
                 }
-            }
-        });
+            )
+        };
+        return envelope.ToJsonString();
     }
 
     private static string BuildPlayPromptOperationNotification(string callId, string operationId)
     {
-        return JsonSerializer.Serialize(new
+        var envelope = new JsonObject
         {
-            @odatatype = "#microsoft.graph.commsNotifications",
-            value = new[]
-            {
-                new
+            ["@odata.type"] = "#microsoft.graph.commsNotifications",
+            ["value"] = new JsonArray(
+                new JsonObject
                 {
-                    @odatatype   = "#microsoft.graph.commsNotification",
-                    changeType   = "updated",
-                    resourceUrl  = $"/communications/calls/{callId}/operations/{operationId}",
-                    resourceData = new
+                    ["@odata.type"]  = "#microsoft.graph.commsNotification",
+                    ["changeType"]   = "updated",
+                    ["resourceUrl"]  = $"/communications/calls/{callId}/operations/{operationId}",
+                    ["resourceData"] = new JsonObject
                     {
-                        @odatatype    = "#microsoft.graph.playPromptOperation",
-                        id            = operationId,
-                        status        = "completed",
-                        clientContext = callId
+                        ["@odata.type"]   = "#microsoft.graph.playPromptOperation",
+                        ["id"]            = operationId,
+                        ["status"]        = "completed",
+                        ["clientContext"] = callId
                     }
                 }
-            }
-        });
+            )
+        };
+        return envelope.ToJsonString();
     }
 
     /// <summary>
@@ -396,27 +407,32 @@ public class MockTeamsBridge : IAcsBridge
     private static string BuildRecordOperationNotification(
         string callId, string operationId, string transcript)
     {
-        return JsonSerializer.Serialize(new
+        var envelope = new JsonObject
         {
-            @odatatype = "#microsoft.graph.commsNotifications",
-            value = new[]
-            {
-                new
+            ["@odata.type"] = "#microsoft.graph.commsNotifications",
+            ["value"] = new JsonArray(
+                new JsonObject
                 {
-                    @odatatype   = "#microsoft.graph.commsNotification",
-                    changeType   = "updated",
-                    resourceUrl  = $"/communications/calls/{callId}/operations/{operationId}",
-                    resourceData = new
+                    ["@odata.type"]  = "#microsoft.graph.commsNotification",
+                    ["changeType"]   = "updated",
+                    ["resourceUrl"]  = $"/communications/calls/{callId}/operations/{operationId}",
+                    ["resourceData"] = new JsonObject
                     {
-                        @odatatype    = "#microsoft.graph.recordOperation",
-                        id            = operationId,
-                        status        = "completed",
-                        clientContext = $"{callId}|{transcript}", // simulator encodes transcript here
-                        resultInfo    = new { code = 200, subCode = 8541, message = "Stop tone received." }
+                        ["@odata.type"]   = "#microsoft.graph.recordOperation",
+                        ["id"]            = operationId,
+                        ["status"]        = "completed",
+                        ["clientContext"] = $"{callId}|{transcript}",
+                        ["resultInfo"]    = new JsonObject
+                        {
+                            ["code"]    = 200,
+                            ["subCode"] = 8541,
+                            ["message"] = "Stop tone received."
+                        }
                     }
                 }
-            }
-        });
+            )
+        };
+        return envelope.ToJsonString();
     }
 
     // ════════════════════════════════════════════════════════════

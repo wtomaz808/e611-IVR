@@ -56,7 +56,7 @@
                     <button class="btn btn-danger flex-fill" @onclick="HangUp" disabled="@(_activeCall == null)">
                         <i class="bi bi-telephone-x-fill me-1"></i> Hang Up
                     </button>
-                    @if (_activeCall != null && (_activeCall.State == CallState.Failed || _activeCall.State == CallState.Disconnected || _activeCall.State == CallState.IvrTransfer))
+                    @if (_activeCall != null)
                     {
                         <button class="btn btn-outline-secondary" @onclick="ResetCall" title="Clear stale call and reset dialer">
                             <i class="bi bi-arrow-counterclockwise"></i>

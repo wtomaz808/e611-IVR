@@ -42,3 +42,8 @@ param teamsBotAppPassword = ''
 // Create the bot manually: portal.azure.us > Microsoft Foundry > Bot services > + Create
 // Then add Teams channel and set callingWebhook to the botMessagingEndpoint output.
 param deployBotService = false
+
+// Route IVR Function App Graph API calls through the simulator's mock Graph endpoint
+// so call control operations (answer, playPrompt, recordResponse, transfer) are
+// intercepted by the simulator instead of going to the real Microsoft Graph.
+param simulatorGraphEndpoint = 'https://ivr-teams-simulator-hgknk444g237w.azurewebsites.us/graph/v1.0'

@@ -2,9 +2,10 @@
 # Uses PowerShell Az module to avoid Azure CLI terminal lockup issues
 
 param(
-    [string]$ResourceGroup = "rg-ivr-dev",
-    [string]$AdminAppName = "ivr-dev-admin-4c5ax3aimbdsy",
-    [string]$SimulatorAppName = "ivr-dev-simulator-4c5ax3aimbdsy"
+    [string]$ResourceGroup = "rg-ivr-teams",
+    [string]$AdminAppName = "ivr-teams-admin-hgknk444g237w",
+    [string]$SimulatorAppName = "ivr-teams-simulator-hgknk444g237w",
+    [string]$FunctionAppName = "ivr-teams-func-hgknk444g237w"
 )
 
 Write-Host "Starting deployment to Azure Web Apps..." -ForegroundColor Cyan

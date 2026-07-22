@@ -425,6 +425,60 @@ public static class PromptSeeder
             CreatedBy = "System Seeder"
         });
 
+        // ===== PROMPTS REFERENCED BY MENU SEEDER (must match MenuSeeder IDs) =====
+        // These map to the IDs the MenuSeeder stores in Cosmos DB.
+
+        prompts.Add(new IvrPrompt { Id = "prompt-welcome", Name = "Main Welcome", Type = PromptType.Tts, TtsVoice = "en-US-JennyNeural", Category = "Welcome", CreatedBy = "System Seeder",
+            TtsText = "Thank you for calling E 9 1 1 Emergency Services. Press 1 for Emergency Dispatch. Press 2 for Alarm Administrator. Press 3 for Fire Dispatcher. Press 4 for Police Dispatcher. Press star to repeat." });
+
+        prompts.Add(new IvrPrompt { Id = "prompt-timeout", Name = "Timeout", Type = PromptType.Tts, TtsVoice = "en-US-JennyNeural", Category = "Error", CreatedBy = "System Seeder",
+            TtsText = "We did not receive your input. Please try again." });
+
+        prompts.Add(new IvrPrompt { Id = "prompt-invalid", Name = "Invalid Input", Type = PromptType.Tts, TtsVoice = "en-US-JennyNeural", Category = "Error", CreatedBy = "System Seeder",
+            TtsText = "That option is not available. Please press a valid key." });
+
+        prompts.Add(new IvrPrompt { Id = "prompt-emergency-transfer", Name = "Emergency Transfer", Type = PromptType.Tts, TtsVoice = "en-US-JennyNeural", Category = "Transfer", CreatedBy = "System Seeder",
+            TtsText = "Please stay on the line. Transferring you to the Emergency Dispatcher now." });
+
+        prompts.Add(new IvrPrompt { Id = "prompt-lamas-area", Name = "LAMAS Area Selection", Type = PromptType.Tts, TtsVoice = "en-US-JennyNeural", Category = "Menu", CreatedBy = "System Seeder",
+            TtsText = "Alarm Administrator. Press 1 for the primary area. Press 2 for secondary area. Press 9 to return to the main menu." });
+
+        prompts.Add(new IvrPrompt { Id = "prompt-alarm-select", Name = "Alarm Select", Type = PromptType.Tts, TtsVoice = "en-US-JennyNeural", Category = "Menu", CreatedBy = "System Seeder",
+            TtsText = "Select alarm type. Press 1 for intrusion. Press 2 for fire. Press 3 for medical. Press 9 to go back." });
+
+        prompts.Add(new IvrPrompt { Id = "prompt-alarm-status", Name = "Alarm Status", Type = PromptType.Tts, TtsVoice = "en-US-JennyNeural", Category = "Menu", CreatedBy = "System Seeder",
+            TtsText = "Alarm status options. Press 1 to submit a work order. Press 9 to return to the main menu." });
+
+        prompts.Add(new IvrPrompt { Id = "prompt-alarm-submitted", Name = "Alarm Submitted", Type = PromptType.Tts, TtsVoice = "en-US-JennyNeural", Category = "Confirmation", CreatedBy = "System Seeder",
+            TtsText = "Your alarm work order has been submitted. A technician will contact you shortly." });
+
+        prompts.Add(new IvrPrompt { Id = "prompt-fire-department", Name = "Fire Department Menu", Type = PromptType.Tts, TtsVoice = "en-US-JennyNeural", Category = "Menu", CreatedBy = "System Seeder",
+            TtsText = "Fire Dispatcher. Press 1 to report an active fire. Press 2 for smoke or gas leak. Press 3 for fire safety. Press 9 to return to the main menu." });
+
+        prompts.Add(new IvrPrompt { Id = "prompt-fire-reason", Name = "Fire Reason", Type = PromptType.Tts, TtsVoice = "en-US-JennyNeural", Category = "Menu", CreatedBy = "System Seeder",
+            TtsText = "Please describe the nature of the fire emergency after the tone." });
+
+        prompts.Add(new IvrPrompt { Id = "prompt-transfer-fire", Name = "Transfer to Fire", Type = PromptType.Tts, TtsVoice = "en-US-JennyNeural", Category = "Transfer", CreatedBy = "System Seeder",
+            TtsText = "Connecting you to the Fire Dispatcher now. Please stay on the line." });
+
+        prompts.Add(new IvrPrompt { Id = "prompt-police-department", Name = "Police Department Menu", Type = PromptType.Tts, TtsVoice = "en-US-JennyNeural", Category = "Menu", CreatedBy = "System Seeder",
+            TtsText = "Police Dispatcher. Press 1 for an active emergency. Press 2 to report a crime. Press 3 for traffic incident. Press 9 to return to the main menu." });
+
+        prompts.Add(new IvrPrompt { Id = "prompt-police-reason", Name = "Police Reason", Type = PromptType.Tts, TtsVoice = "en-US-JennyNeural", Category = "Menu", CreatedBy = "System Seeder",
+            TtsText = "Please describe the nature of the police emergency after the tone." });
+
+        prompts.Add(new IvrPrompt { Id = "prompt-transfer-police", Name = "Transfer to Police", Type = PromptType.Tts, TtsVoice = "en-US-JennyNeural", Category = "Transfer", CreatedBy = "System Seeder",
+            TtsText = "Connecting you to the Police Dispatcher now. Please stay on the line." });
+
+        prompts.Add(new IvrPrompt { Id = "prompt-speech", Name = "Speech Input", Type = PromptType.Tts, TtsVoice = "en-US-JennyNeural", Category = "Menu", CreatedBy = "System Seeder",
+            TtsText = "Please describe your emergency after the tone." });
+
+        prompts.Add(new IvrPrompt { Id = "prompt-afterhours", Name = "After Hours", Type = PromptType.Tts, TtsVoice = "en-US-JennyNeural", Category = "Welcome", CreatedBy = "System Seeder",
+            TtsText = "You have reached E 9 1 1 Emergency Services outside of regular business hours. For immediate emergency assistance, please call 9 1 1." });
+
+        prompts.Add(new IvrPrompt { Id = "prompt-goodbye", Name = "Goodbye", Type = PromptType.Tts, TtsVoice = "en-US-JennyNeural", Category = "Welcome", CreatedBy = "System Seeder",
+            TtsText = "Thank you for calling E 9 1 1 Emergency Services. Goodbye." });
+
         return prompts;
     }
 }
