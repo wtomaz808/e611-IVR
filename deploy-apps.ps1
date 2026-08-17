@@ -10,6 +10,7 @@ param(
 
 Write-Host "Starting deployment to Azure Web Apps..." -ForegroundColor Cyan
 Write-Host "Resource Group: $ResourceGroup" -ForegroundColor Yellow
+Write-Host "Function App: $FunctionAppName" -ForegroundColor Yellow
 Write-Host "Admin App: $AdminAppName" -ForegroundColor Yellow
 Write-Host "Simulator App: $SimulatorAppName" -ForegroundColor Yellow
 Write-Host ""
@@ -34,6 +35,35 @@ try {
     Write-Host "Not logged into Azure. Please run: Connect-AzAccount" -ForegroundColor Red
     exit 1
 }
+
+# Deploy Function App
+Write-Host "═══════════════════════════════════════════════" -ForegroundColor Cyan
+Write-Host "Deploying Function App..." -ForegroundColor Cyan
+Write-Host "═══════════════════════════════════════════════" -ForegroundColor Cyan
+
+$functionZipPath = "src\IVR.Functions\deploy.zip"
+if (!(Test-Path $functionZipPath)) {
+    Write-Host "ERROR: Function App deploy.zip not found at: $functionZipPath" -ForegroundColor Red
+    Write-Host "Please build the application first." -ForegroundColor Red
+    exit 1
+}
+
+try {
+    Write-Host "Uploading Function App package..." -ForegroundColor Yellow
+    Publish-AzWebApp `
+        -ResourceGroupName $ResourceGroup `
+        -Name $FunctionAppName `
+        -ArchivePath (Resolve-Path $functionZipPath).Path `
+        -Force
+
+    Write-Host "✓ Function App deployed successfully!" -ForegroundColor Green
+    Write-Host "  URL: https://$FunctionAppName.azurewebsites.us" -ForegroundColor Green
+} catch {
+    Write-Host "✗ Failed to deploy Function App: $_" -ForegroundColor Red
+    exit 1
+}
+
+Write-Host ""
 
 # Deploy Admin Portal
 Write-Host "═══════════════════════════════════════════════" -ForegroundColor Cyan
@@ -96,6 +126,7 @@ Write-Host "══════════════════════�
 Write-Host "Deployment Complete!" -ForegroundColor Green
 Write-Host "═══════════════════════════════════════════════" -ForegroundColor Cyan
 Write-Host ""
+Write-Host "Function App: https://$FunctionAppName.azurewebsites.us" -ForegroundColor Cyan
 Write-Host "Admin Portal: https://$AdminAppName.azurewebsites.us" -ForegroundColor Cyan
 Write-Host "PSTN Simulator: https://$SimulatorAppName.azurewebsites.us" -ForegroundColor Cyan
 Write-Host ""

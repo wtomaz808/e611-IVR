@@ -176,9 +176,16 @@ See `docs/cm10-setup-guide.md` for Avaya CM10 integration via Direct Routing.
 **Solution**: ACS is a global service, but ensure `dataLocation` is set to `unitedstates`
 
 **Issue**: Function App can't connect to Cosmos DB  
-**Solution**: Check managed identity permissions and connection strings in App Configuration
+**Solution**: Check managed identity permissions and connection strings in App Configuration. If `CosmosDbConnectionString` is a Key Vault reference (`@Microsoft.KeyVault(SecretUri=...)`), confirm the app's system-assigned identity has the `Key Vault Secrets User` role on the vault — check under Configuration → the setting should show a green checkmark, not a warning icon.
 
 ## Security & Compliance
+
+### Secrets Management
+The Cosmos DB connection string is stored in Key Vault (`modules/keyvault.bicep`) rather than as
+a plaintext App Setting. The Function App and Admin Portal each use a system-assigned managed
+identity granted `Key Vault Secrets User` (`modules/keyvault-access.bicep`) and reference the
+secret via `@Microsoft.KeyVault(SecretUri=...)`. Rotating the Cosmos DB key only requires updating
+the Key Vault secret — App Settings don't need to change.
 
 ### FedRAMP Compliance
 Azure Government is FedRAMP High authorized. Ensure your deployment meets your agency's requirements:

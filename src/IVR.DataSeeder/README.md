@@ -102,7 +102,28 @@ Features tested:
 
 ## Usage
 
-### Azure Environment
+### Azure Environment (Recommended: Key Vault)
+
+The connection string is stored in Key Vault rather than checked into `appsettings.json`.
+
+1. Set `KeyVault:Uri` in `appsettings.json` (already configured for the shared dev vault):
+   ```json
+   { "KeyVault": { "Uri": "https://ivr-kv-hgknk444g237w.vault.usgovcloudapi.net/" } }
+   ```
+2. Sign in with an identity that has `Key Vault Secrets User` (or `Secrets Officer`) on that vault:
+   ```powershell
+   Connect-AzAccount -Environment AzureUSGovernment
+   ```
+3. Run the seeder — it fetches the `CosmosDbConnectionString` secret automatically via `DefaultAzureCredential`:
+   ```bash
+   cd src/IVR.DataSeeder
+   dotnet run
+   ```
+
+### Azure Environment (Direct Connection String)
+
+If you don't have Key Vault access, you can still supply the connection string directly —
+just don't commit it to `appsettings.json`.
 
 1. Get your Cosmos DB connection string:
    ```bash
@@ -190,12 +211,13 @@ Next steps:
 
 Configuration can be provided via:
 
-1. **appsettings.json** - Default configuration
+1. **appsettings.json** - Default configuration (`KeyVault:Uri` recommended for secrets)
 2. **appsettings.Development.json** - Development overrides
 3. **Environment variables** - Use double underscore: `CosmosDb__ConnectionString`
 4. **Command line** - `dotnet run --CosmosDb:ConnectionString="..."`
 
-Priority order: Command line > Environment > appsettings.Development.json > appsettings.json
+Priority order: Command line > Environment > appsettings.Development.json > appsettings.json.
+Key Vault is only consulted when none of the above supply `CosmosDb:ConnectionString`.
 
 ## Exit Codes
 

@@ -163,7 +163,7 @@ Update the following application settings on the IVR Function App in your Azure 
 | `MicrosoftAppTenantId` | `<customer-tenant-id>` | The customer's Azure AD / M365 tenant ID |
 | `GraphApiEndpoint` | `https://graph.microsoft.us/v1.0` | Microsoft Graph for Government |
 | `ChannelService` | `https://botframework.azure.us` | Bot Framework Government endpoint |
-| `CosmosDbConnectionString` | `AccountEndpoint=https://...` | Your Cosmos DB (no change) |
+| `CosmosDbConnectionString` | `@Microsoft.KeyVault(SecretUri=https://<vault>.vault.usgovcloudapi.net/secrets/CosmosDbConnectionString/)` | Key Vault reference — rotate the secret in Key Vault, not this setting |
 | `StorageConnectionString` | `DefaultEndpointsProtocol=...` | Your Blob Storage (no change) |
 | `CognitiveServicesEndpoint` | `https://...cognitiveservices.azure.us/...` | Your Speech service (no change) |
 | `CognitiveServicesKey` | `<key>` | Your Speech service key (no change) |

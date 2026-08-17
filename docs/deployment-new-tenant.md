@@ -171,8 +171,10 @@ az webapp deploy \
 ```bash
 cd src/IVR.DataSeeder
 
-# Update appsettings.json with your Cosmos DB connection string
-# (Get it from Azure Portal or deployment outputs)
+# Recommended: set KeyVault:Uri in appsettings.json and the seeder fetches
+# the Cosmos DB connection string automatically (see src/IVR.DataSeeder/README.md).
+# Otherwise, pass it directly:
+# dotnet run --CosmosDb:ConnectionString="AccountEndpoint=https://..."
 
 dotnet run
 ```

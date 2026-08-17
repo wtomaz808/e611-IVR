@@ -292,7 +292,7 @@ The Function App reads configuration from multiple sources:
 | `MicrosoftAppTenantId` | Azure AD tenant ID |
 | `GraphApiEndpoint` | Microsoft Graph endpoint (real or simulator) |
 | `ChannelService` | Bot Framework channel service URL (Gov: `https://botframework.azure.us`) |
-| `CosmosDbConnectionString` | Cosmos DB access |
+| `CosmosDbConnectionString` | Cosmos DB access. Deployed as a Key Vault reference (`@Microsoft.KeyVault(SecretUri=...)`), resolved at runtime via the Function App's system-assigned identity. |
 | `StorageConnectionString` | Blob Storage for audio files |
 | `CognitiveServicesEndpoint` | Text-to-speech synthesis |
 | `CognitiveServicesKey` | Cognitive Services authentication key |

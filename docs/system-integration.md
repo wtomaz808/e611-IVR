@@ -269,10 +269,34 @@ Defines which fields the AI should extract from the transcript (stored in `DataE
     "type": "Hangup",
     "promptId": "prompt-goodbye"
   },
+  "postFailureAction": {
+    "type": "TransferToTeam",
+    "transferNumber": "+15559998888"
+  },
   "isActive": true,
   "partitionKey": "data-extraction"
 }
 ```
+
+### What Happens After Submission
+
+`TeamsCallBot.ExecuteActionAsync` runs the full post-submission flow — this is not just documentation, it's the actual behavior:
+
+1. **Submit** — `ExternalSystemIntegrationService.ExtractAndSubmitAsync` extracts fields from the transcript and posts them to the external system's endpoint.
+2. **Success** →
+   - Plays `successPromptId` if set, otherwise renders `successTtsTemplate` (fields + `{{confirmationValue}}` from the response).
+   - Runs `postSubmitAction` (e.g. `Hangup`, `TransferToTeam`, `NavigateToMenu`). If not configured, the caller is returned to the current menu.
+3. **Failure** (missing required fields, non-2xx response after retries, etc.) →
+   - Plays `failurePromptId` if set, otherwise a generic apology.
+   - Runs `postFailureAction` (e.g. transfer to an on-call team). If not configured, the caller is returned to the current menu to retry.
+
+| Field | Type | Description |
+|---|---|---|
+| `successPromptId` | string? | Pre-recorded/TTS prompt played on success. Takes priority over `successTtsTemplate`. |
+| `successTtsTemplate` | string? | `{{placeholder}}` template rendered with extracted fields + `{{confirmationValue}}`. |
+| `failurePromptId` | string? | Prompt played when the submission fails. Falls back to a generic apology. |
+| `postSubmitAction` | MenuAction? | Executed after the success message plays. Defaults to replaying the current menu. |
+| `postFailureAction` | MenuAction? | Executed after the failure message plays. Defaults to replaying the current menu. |
 
 #### C. Menu Action (links into the call flow)
 
@@ -286,6 +310,7 @@ Defines which fields the AI should extract from the transcript (stored in `DataE
   }
 }
 ```
+
 
 ### Authentication Methods
 
@@ -760,7 +785,7 @@ new AzureOpenAIClient(new Uri(endpoint), new DefaultAzureCredential());
 | `MicrosoftAppTenantId` | Yes | Azure AD tenant ID |
 | `GraphApiEndpoint` | Yes | Microsoft Graph endpoint (real or simulator) |
 | `ChannelService` | Yes | Bot Framework channel service URL |
-| `CosmosDbConnectionString` | Yes | Cosmos DB connection string |
+| `CosmosDbConnectionString` | Yes | Cosmos DB connection string. Set to a Key Vault reference (`@Microsoft.KeyVault(SecretUri=...)`) rather than a plaintext value — see `infra/modules/keyvault.bicep`. |
 | `StorageConnectionString` | Yes | Azure Blob Storage connection string |
 | `CognitiveServicesEndpoint` | Yes | Azure Cognitive Services Speech endpoint URL |
 | `CognitiveServicesKey` | No | Cognitive Services key (uses managed identity if absent) |

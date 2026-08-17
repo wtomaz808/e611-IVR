@@ -7,9 +7,15 @@ namespace IVR.DataSeeder;
 /// </summary>
 public static class MenuSeeder
 {
-    public static List<IvrMenu> GenerateTestMenus()
+    /// <param name="webhookBaseUrl">
+    /// Base URL for the simulator's mock external API. Defaults to the docker-compose
+    /// service hostname; pass the deployed simulator's public URL when seeding a Cosmos DB
+    /// used by a Function App that isn't running inside the same docker-compose network.
+    /// </param>
+    public static List<IvrMenu> GenerateTestMenus(string webhookBaseUrl = "http://pstn-simulator:8080")
     {
         var menus = new List<IvrMenu>();
+        var workOrderWebhookUrl = $"{webhookBaseUrl.TrimEnd('/')}/api/external/work-order";
 
         // ─── Main Menu ──────────────────────────────────────────
         var mainMenu = new IvrMenu
@@ -60,6 +66,13 @@ public static class MenuSeeder
                     Label = "Police Dispatcher",
                     SpeechKeywords = new List<string> { "police", "police dispatcher", "joint base police" },
                     Action = new MenuAction { Type = ActionType.NavigateToMenu, TargetMenuId = "menu-police-dispatch" }
+                },
+                new()
+                {
+                    DtmfKey = "5",
+                    Label = "Fire Alarm AI Assistant",
+                    SpeechKeywords = new List<string> { "fire alarm assistant", "ai assistant", "put alarm in test" },
+                    Action = new MenuAction { Type = ActionType.NavigateToMenu, TargetMenuId = "menu-fire-ai-assistant" }
                 }
             },
             CreatedAt = DateTime.UtcNow.AddDays(-30)
@@ -156,13 +169,13 @@ public static class MenuSeeder
             {
                 new() { DtmfKey = "1", Label = "Inspection",
                     SpeechKeywords = new List<string> { "inspection", "inspect" },
-                    Action = new MenuAction { Type = ActionType.Webhook, WebhookUrl = "http://pstn-simulator:8080/api/external/work-order", PromptId = "prompt-alarm-submitted" } },
+                    Action = new MenuAction { Type = ActionType.Webhook, WebhookUrl = workOrderWebhookUrl, PromptId = "prompt-alarm-submitted" } },
                 new() { DtmfKey = "2", Label = "Test",
                     SpeechKeywords = new List<string> { "test", "testing" },
-                    Action = new MenuAction { Type = ActionType.Webhook, WebhookUrl = "http://pstn-simulator:8080/api/external/work-order", PromptId = "prompt-alarm-submitted" } },
+                    Action = new MenuAction { Type = ActionType.Webhook, WebhookUrl = workOrderWebhookUrl, PromptId = "prompt-alarm-submitted" } },
                 new() { DtmfKey = "3", Label = "Maintenance",
                     SpeechKeywords = new List<string> { "maintenance", "repair", "service" },
-                    Action = new MenuAction { Type = ActionType.Webhook, WebhookUrl = "http://pstn-simulator:8080/api/external/work-order", PromptId = "prompt-alarm-submitted" } }
+                    Action = new MenuAction { Type = ActionType.Webhook, WebhookUrl = workOrderWebhookUrl, PromptId = "prompt-alarm-submitted" } }
             },
             CreatedAt = DateTime.UtcNow.AddDays(-28)
         };
@@ -347,12 +360,35 @@ public static class MenuSeeder
             CreatedAt = DateTime.UtcNow.AddDays(-10)
         };
 
+        // ─── Option 5: Fire Alarm AI Assistant (speech → AI data extraction → external system) ──
+        var fireAiAssistantMenu = new IvrMenu
+        {
+            Id = "menu-fire-ai-assistant",
+            Name = "Fire Alarm AI Assistant",
+            Description = "Caller describes a fire alarm action in natural language; AI extracts fields and submits to the fire alarm panel",
+            MenuType = MenuType.SpeechRouting,
+            ParentMenuId = "menu-main",
+            IsActive = true,
+            EnableSpeechRecognition = true,
+            SpeechRoutingPromptId = "prompt-fire-ai-describe",
+            // No teams configured — this menu always falls through to SpeechFallbackAction,
+            // which runs the DataExtractionConfig-driven SubmitToExternalSystem pipeline.
+            TeamRoutingConfigIds = new List<string>(),
+            SpeechFallbackAction = new MenuAction
+            {
+                Type = ActionType.SubmitToExternalSystem,
+                DataExtractionConfigId = "extract-fire-alarm-001"
+            },
+            Order = 6,
+            CreatedAt = DateTime.UtcNow.AddDays(-1)
+        };
+
         menus.AddRange(new[]
         {
             mainMenu, alarmAdminMenu, alarmSelectMenu, alarmStatusMenu,
             fireDispatchMenu, fireReasonMenu,
             policeDispatchMenu, policeReasonMenu,
-            afterHoursMenu, speechMenu
+            afterHoursMenu, speechMenu, fireAiAssistantMenu
         });
 
         return menus;

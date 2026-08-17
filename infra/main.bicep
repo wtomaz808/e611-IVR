@@ -57,6 +57,18 @@ module storage 'modules/storage.bicep' = {
   }
 }
 
+// ─── Key Vault (secrets referenced by App Settings) ─────────────
+// Named '${baseName}-kv-${uniqueSuffix}' (not namePrefix) to stay within
+// Key Vault's 24-character name limit.
+module keyVault 'modules/keyvault.bicep' = {
+  params: {
+    name: '${baseName}-kv-${uniqueSuffix}'
+    location: location
+    tags: tags
+    cosmosDbConnectionString: cosmosDb.outputs.connectionString
+  }
+}
+
 // ─── Azure Bot Service (Teams Calling) ─────────────────────────
 // The functionApp module is deployed first so we can pass its
 // hostname to the bot service as the messaging endpoint.
@@ -118,7 +130,7 @@ module functionApp 'modules/function-app.bicep' = {
     storageAccountName: storage.outputs.name
     storageAccountKey: storage.outputs.primaryKey
     appInsightsConnectionString: appInsights.outputs.connectionString
-    cosmosDbConnectionString: cosmosDb.outputs.connectionString
+    cosmosDbConnectionString: keyVault.outputs.cosmosDbConnectionStringRef
     botAppId: teamsBotAppId
     botAppPassword: teamsBotAppPassword
     botTenantId: azureAdTenantId
@@ -137,11 +149,22 @@ module appService 'modules/app-service.bicep' = {
     name: '${namePrefix}-admin-${uniqueSuffix}'
     location: location
     tags: tags
-    cosmosDbConnectionString: cosmosDb.outputs.connectionString
+    cosmosDbConnectionString: keyVault.outputs.cosmosDbConnectionStringRef
     storageConnectionString: storage.outputs.connectionString
     appInsightsConnectionString: appInsights.outputs.connectionString
     azureAdTenantId: azureAdTenantId
     azureAdClientId: azureAdClientId
+  }
+}
+
+// ─── Key Vault access — grant both apps' managed identities read access ──
+module keyVaultAccess 'modules/keyvault-access.bicep' = {
+  params: {
+    keyVaultName: keyVault.outputs.name
+    principalIds: [
+      functionApp.outputs.principalId
+      appService.outputs.principalId
+    ]
   }
 }
 

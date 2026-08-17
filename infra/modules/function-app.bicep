@@ -84,6 +84,9 @@ resource functionApp 'Microsoft.Web/sites@2023-12-01' = {
   location: location
   tags: tags
   kind: 'functionapp'
+  identity: {
+    type: 'SystemAssigned'
+  }
   properties: {
     serverFarmId: hostingPlan.id
     httpsOnly: true
@@ -129,3 +132,6 @@ output resourceId string = functionApp.id
 
 @description('Raw hostname (no scheme) — used to construct the Bot messaging endpoint')
 output rawHostname string = functionApp.properties.defaultHostName
+
+@description('System-assigned managed identity principal ID')
+output principalId string = functionApp.identity.principalId

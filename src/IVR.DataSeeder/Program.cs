@@ -1,6 +1,8 @@
 using IVR.Core.Models;
 using IVR.Core.Services;
 using IVR.DataSeeder;
+using Azure.Identity;
+using Azure.Security.KeyVault.Secrets;
 using Microsoft.Azure.Cosmos;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
@@ -20,18 +22,41 @@ var configuration = new ConfigurationBuilder()
 
 var connectionString = configuration["CosmosDb:ConnectionString"];
 var databaseName = configuration["CosmosDb:DatabaseName"] ?? "IvrDatabase";
+var webhookBaseUrl = configuration["ExternalSystems:WebhookBaseUrl"] ?? "http://pstn-simulator:8080";
+
+// Prefer Key Vault over a plaintext connection string in config.
+var keyVaultUri = configuration["KeyVault:Uri"];
+if (string.IsNullOrEmpty(connectionString) && !string.IsNullOrEmpty(keyVaultUri))
+{
+    Console.WriteLine($"🔐 Fetching Cosmos DB connection string from Key Vault ({keyVaultUri})...");
+    var credential = new DefaultAzureCredential(new DefaultAzureCredentialOptions
+    {
+        // Azure Government vaults use a different AAD authority than public cloud.
+        AuthorityHost = keyVaultUri.Contains("usgovcloudapi.net", StringComparison.OrdinalIgnoreCase)
+            ? AzureAuthorityHosts.AzureGovernment
+            : AzureAuthorityHosts.AzurePublicCloud
+    });
+    var secretClient = new SecretClient(new Uri(keyVaultUri), credential);
+    var secretName = configuration["KeyVault:CosmosDbSecretName"] ?? "CosmosDbConnectionString";
+    var secret = await secretClient.GetSecretAsync(secretName);
+    connectionString = secret.Value.Value;
+    Console.WriteLine("✅ Retrieved connection string from Key Vault");
+    Console.WriteLine();
+}
 
 if (string.IsNullOrEmpty(connectionString))
 {
     Console.WriteLine("❌ Error: CosmosDb:ConnectionString not configured.");
     Console.WriteLine();
     Console.WriteLine("Please set the connection string in one of these ways:");
-    Console.WriteLine("  1. Add to appsettings.json -> CosmosDb:ConnectionString");
-    Console.WriteLine("  2. Set environment variable: CosmosDb__ConnectionString");
-    Console.WriteLine("  3. Pass as command line: dotnet run --CosmosDb:ConnectionString=\"...\"");
+    Console.WriteLine("  1. Set KeyVault:Uri in appsettings.json to fetch it from Key Vault (recommended)");
+    Console.WriteLine("  2. Add to appsettings.json -> CosmosDb:ConnectionString");
+    Console.WriteLine("  3. Set environment variable: CosmosDb__ConnectionString");
+    Console.WriteLine("  4. Pass as command line: dotnet run --CosmosDb:ConnectionString=\"...\"");
     Console.WriteLine();
     return 1;
 }
+
 
 try
 {
@@ -162,7 +187,7 @@ try
     // ========================================
     // SEED MENUS (Call Flows)
     // ========================================
-    var menus = MenuSeeder.GenerateTestMenus();
+    var menus = MenuSeeder.GenerateTestMenus(webhookBaseUrl);
     Console.WriteLine($"📋 SEEDING MENUS / CALL FLOWS ({menus.Count} total)");
     Console.WriteLine("─────────────────────────────────────────────────────────");
 
@@ -222,6 +247,68 @@ try
     totalErrors += teamErrors;
 
     // ========================================
+    // SEED EXTERNAL SYSTEMS
+    // ========================================
+    var externalSystems = ExternalSystemSeeder.GenerateTestExternalSystems(webhookBaseUrl);
+    Console.WriteLine($"🔌 SEEDING EXTERNAL SYSTEMS ({externalSystems.Count} total)");
+    Console.WriteLine("────────────────────────────────────────────");
+
+    int externalSystemSuccess = 0;
+    int externalSystemErrors = 0;
+
+    foreach (var system in externalSystems)
+    {
+        try
+        {
+            await cosmosService.UpsertExternalSystemConfigAsync(system);
+            Console.WriteLine($"  ✅ {system.SystemName} ({system.BaseUrl})");
+            externalSystemSuccess++;
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"  ❌ {system.SystemName}: {ex.Message}");
+            externalSystemErrors++;
+        }
+    }
+
+    Console.WriteLine($"  📊 External Systems: {externalSystemSuccess} succeeded, {externalSystemErrors} failed");
+    Console.WriteLine();
+
+    totalSuccess += externalSystemSuccess;
+    totalErrors += externalSystemErrors;
+
+    // ========================================
+    // SEED DATA EXTRACTION CONFIGS
+    // ========================================
+    var dataExtractionConfigs = ExternalSystemSeeder.GenerateTestDataExtractionConfigs();
+    Console.WriteLine($"🧠 SEEDING DATA EXTRACTION CONFIGS ({dataExtractionConfigs.Count} total)");
+    Console.WriteLine("────────────────────────────────────────────");
+
+    int dataExtractionSuccess = 0;
+    int dataExtractionErrors = 0;
+
+    foreach (var extraction in dataExtractionConfigs)
+    {
+        try
+        {
+            await cosmosService.UpsertDataExtractionConfigAsync(extraction);
+            Console.WriteLine($"  ✅ {extraction.Name}");
+            dataExtractionSuccess++;
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"  ❌ {extraction.Name}: {ex.Message}");
+            dataExtractionErrors++;
+        }
+    }
+
+    Console.WriteLine($"  📊 Data Extraction Configs: {dataExtractionSuccess} succeeded, {dataExtractionErrors} failed");
+    Console.WriteLine();
+
+    totalSuccess += dataExtractionSuccess;
+    totalErrors += dataExtractionErrors;
+
+    // ========================================
     // SEED PHONE NUMBER CONFIGS (Teams DIDs)
     // ========================================
     var phoneNumbers = PhoneNumberSeeder.GeneratePhoneNumberConfigs();
@@ -268,6 +355,8 @@ try
     Console.WriteLine($"   ALI Records:    {aliSuccess}/{aliRecords.Count}");
     Console.WriteLine($"   Menus:          {menuSuccess}/{menus.Count}");
     Console.WriteLine($"   Team Routing:   {teamSuccess}/{teamConfigs.Count}");
+    Console.WriteLine($"   External Systems:      {externalSystemSuccess}/{externalSystems.Count}");
+    Console.WriteLine($"   Data Extraction Configs: {dataExtractionSuccess}/{dataExtractionConfigs.Count}");
     Console.WriteLine($"   Phone Numbers:  {phoneSuccess}/{phoneNumbers.Count}");
     Console.WriteLine("═══════════════════════════════════════════════════════════");
     Console.WriteLine();

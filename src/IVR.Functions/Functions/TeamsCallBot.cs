@@ -587,14 +587,22 @@ public class TeamsCallBot
 
             case ActionType.Webhook:
                 if (action.WebhookUrl is not null)
-                    await DispatchSimpleWebhookAsync(callLog, action.WebhookUrl);
+                {
+                    var webhookSuccess = await DispatchSimpleWebhookAsync(callLog, action.WebhookUrl);
+                    if (webhookSuccess && action.PromptId is not null)
+                    {
+                        var prompt   = await _promptService.ResolvePromptAsync(action.PromptId);
+                        var audioUrl = await ResolveAudioUrlAsync(prompt);
+                        await GraphPlayPromptAsync(callId, audioUrl);
+                        await Task.Delay(2000);
+                    }
+                }
                 break;
 
             case ActionType.SubmitToExternalSystem:
                 if (action.DataExtractionConfigId is not null && callLog.Transcript is not null)
-                    await _externalIntegration.ExtractAndSubmitAsync(
-                        callLog.Transcript, action.DataExtractionConfigId, callLog.CallerNumber);
-                break;
+                    await HandleExternalSystemSubmissionAsync(callId, callLog, action.DataExtractionConfigId);
+                return;
 
             case ActionType.RepeatMenu:
                 // Fall through to default replay below
@@ -602,14 +610,103 @@ public class TeamsCallBot
         }
 
         // Default fallback: replay current menu
-        var currentMenuId = callLog.Metadata.GetValueOrDefault(MetaCurrentMenuId);
-        if (currentMenuId is not null)
+        await ReplayCurrentMenuAsync(callId, callLog);
+    }
+
+    /// <summary>
+    /// Submit extracted caller data to the configured external system, then play a
+    /// success/failure message and run the DataExtractionConfig's post-submit action
+    /// (e.g. hang up, transfer, or return to a menu).
+    /// </summary>
+    private async Task HandleExternalSystemSubmissionAsync(string callId, CallLog callLog, string dataExtractionConfigId)
+    {
+        var config = await _cosmosDb.GetDataExtractionConfigAsync(dataExtractionConfigId);
+        var result = await _externalIntegration.ExtractAndSubmitAsync(
+            callLog.Transcript!, dataExtractionConfigId, callLog.CallerNumber);
+
+        callLog.Metadata["lastSubmissionSuccess"] = result.Success.ToString();
+        if (result.ConfirmationValue is not null)
+            callLog.Metadata["lastSubmissionRef"] = result.ConfirmationValue;
+        await _cosmosDb.UpdateCallLogAsync(callLog);
+
+        if (result.Success)
         {
-            var currentMenu = await _cosmosDb.GetMenuAsync(currentMenuId);
-            if (currentMenu is not null)
-            {
-                await PlayMenuAsync(callId, callLog, currentMenu);
-            }
+            _logger.LogInformation(
+                "External system submission succeeded for call {CallId}: {System}/{Action} ref={Ref}",
+                callId, result.SystemName, result.ActionName, result.ConfirmationValue);
+
+            await PlaySuccessMessageAsync(callId, config, result);
+
+            if (config?.PostSubmitAction is not null)
+                await ExecuteActionAsync(callId, callLog, config.PostSubmitAction);
+            else
+                await ReplayCurrentMenuAsync(callId, callLog);
+        }
+        else
+        {
+            _logger.LogWarning("External system submission failed for call {CallId}: {Error}",
+                callId, result.ErrorMessage);
+
+            await PlayFailureMessageAsync(callId, config);
+
+            if (config?.PostFailureAction is not null)
+                await ExecuteActionAsync(callId, callLog, config.PostFailureAction);
+            else
+                await ReplayCurrentMenuAsync(callId, callLog);
+        }
+    }
+
+    /// <summary>Play the configured success prompt, or render SuccessTtsTemplate with the extracted fields/confirmation value.</summary>
+    private async Task PlaySuccessMessageAsync(string callId, DataExtractionConfig? config, ExternalSystemSubmissionResult result)
+    {
+        string audioUrl;
+        if (!string.IsNullOrEmpty(config?.SuccessPromptId))
+        {
+            var prompt = await _promptService.ResolvePromptAsync(config.SuccessPromptId);
+            audioUrl = await ResolveAudioUrlAsync(prompt);
+        }
+        else
+        {
+            var message = !string.IsNullOrEmpty(config?.SuccessTtsTemplate)
+                ? ExternalSystemIntegrationService.BuildConfirmationMessage(
+                    config.SuccessTtsTemplate, result.ExtractedFields, result.ConfirmationValue)
+                : "Your request has been submitted successfully.";
+            audioUrl = await _ttsService.GetAudioUrlAsync(message);
+        }
+
+        await GraphPlayPromptAsync(callId, audioUrl);
+        await Task.Delay(2000);
+    }
+
+    /// <summary>Play the configured failure prompt, or a generic apology if none is configured.</summary>
+    private async Task PlayFailureMessageAsync(string callId, DataExtractionConfig? config)
+    {
+        string audioUrl;
+        if (!string.IsNullOrEmpty(config?.FailurePromptId))
+        {
+            var prompt = await _promptService.ResolvePromptAsync(config.FailurePromptId);
+            audioUrl = await ResolveAudioUrlAsync(prompt);
+        }
+        else
+        {
+            audioUrl = await _ttsService.GetAudioUrlAsync(
+                "Sorry, we weren't able to complete that request. Let's try that again.");
+        }
+
+        await GraphPlayPromptAsync(callId, audioUrl);
+        await Task.Delay(2000);
+    }
+
+    /// <summary>Replay whatever menu is currently tracked on the call log (default fallback).</summary>
+    private async Task ReplayCurrentMenuAsync(string callId, CallLog callLog)
+    {
+        var currentMenuId = callLog.Metadata.GetValueOrDefault(MetaCurrentMenuId);
+        if (currentMenuId is null) return;
+
+        var currentMenu = await _cosmosDb.GetMenuAsync(currentMenuId);
+        if (currentMenu is not null)
+        {
+            await PlayMenuAsync(callId, callLog, currentMenu);
         }
     }
 
@@ -879,8 +976,8 @@ public class TeamsCallBot
     private void LogNoGraph() =>
         _logger.LogWarning("GraphServiceClient is not configured — Graph call control skipped");
 
-    /// <summary>Fire-and-forget HTTP POST to a webhook URL with the call context as JSON body.</summary>
-    private async Task DispatchSimpleWebhookAsync(CallLog callLog, string webhookUrl)
+    /// <summary>POST call context to a webhook URL. Returns whether the request succeeded, so callers can decide whether to play a confirmation prompt.</summary>
+    private async Task<bool> DispatchSimpleWebhookAsync(CallLog callLog, string webhookUrl)
     {
         try
         {
@@ -892,12 +989,14 @@ public class TeamsCallBot
                 calledNumber = callLog.CalledNumber,
                 timestamp    = DateTime.UtcNow
             });
-            await client.PostAsync(webhookUrl,
+            var response = await client.PostAsync(webhookUrl,
                 new StringContent(payload, Encoding.UTF8, "application/json"));
+            return response.IsSuccessStatusCode;
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Webhook POST to {Url} failed", webhookUrl);
+            return false;
         }
     }
 

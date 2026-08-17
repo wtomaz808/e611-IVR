@@ -429,7 +429,7 @@ public static class PromptSeeder
         // These map to the IDs the MenuSeeder stores in Cosmos DB.
 
         prompts.Add(new IvrPrompt { Id = "prompt-welcome", Name = "Main Welcome", Type = PromptType.Tts, TtsVoice = "en-US-JennyNeural", Category = "Welcome", CreatedBy = "System Seeder",
-            TtsText = "Thank you for calling E 9 1 1 Emergency Services. Press 1 for Emergency Dispatch. Press 2 for Alarm Administrator. Press 3 for Fire Dispatcher. Press 4 for Police Dispatcher. Press star to repeat." });
+            TtsText = "Thank you for calling E 9 1 1 Emergency Services. Press 1 for Emergency Dispatch. Press 2 for Alarm Administrator. Press 3 for Fire Dispatcher. Press 4 for Police Dispatcher. Press 5 for the Fire Alarm AI Assistant. Press star to repeat." });
 
         prompts.Add(new IvrPrompt { Id = "prompt-timeout", Name = "Timeout", Type = PromptType.Tts, TtsVoice = "en-US-JennyNeural", Category = "Error", CreatedBy = "System Seeder",
             TtsText = "We did not receive your input. Please try again." });
@@ -451,6 +451,12 @@ public static class PromptSeeder
 
         prompts.Add(new IvrPrompt { Id = "prompt-alarm-submitted", Name = "Alarm Submitted", Type = PromptType.Tts, TtsVoice = "en-US-JennyNeural", Category = "Confirmation", CreatedBy = "System Seeder",
             TtsText = "Your alarm work order has been submitted. A technician will contact you shortly." });
+
+        prompts.Add(new IvrPrompt { Id = "prompt-alarm-error", Name = "Alarm Submission Error", Type = PromptType.Tts, TtsVoice = "en-US-JennyNeural", Category = "Error", CreatedBy = "System Seeder",
+            TtsText = "We were unable to submit that request automatically. Let's connect you with a fire dispatcher instead." });
+
+        prompts.Add(new IvrPrompt { Id = "prompt-fire-ai-describe", Name = "Fire Alarm AI Describe", Type = PromptType.Tts, TtsVoice = "en-US-JennyNeural", Category = "Menu", CreatedBy = "System Seeder",
+            TtsText = "Please describe what you'd like done with the fire alarm system, for example, put the alarms in Building 7 into test mode." });
 
         prompts.Add(new IvrPrompt { Id = "prompt-fire-department", Name = "Fire Department Menu", Type = PromptType.Tts, TtsVoice = "en-US-JennyNeural", Category = "Menu", CreatedBy = "System Seeder",
             TtsText = "Fire Dispatcher. Press 1 to report an active fire. Press 2 for smoke or gas leak. Press 3 for fire safety. Press 9 to return to the main menu." });

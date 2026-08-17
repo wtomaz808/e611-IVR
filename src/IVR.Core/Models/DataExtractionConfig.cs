@@ -101,6 +101,13 @@ public class DataExtractionConfig
     [JsonPropertyName("postSubmitAction")]
     public MenuAction? PostSubmitAction { get; set; }
 
+    /// <summary>
+    /// Action to take after a failed submission (e.g. transfer to an agent, hang up).
+    /// If null, the caller is returned to the current menu to retry.
+    /// </summary>
+    [JsonPropertyName("postFailureAction")]
+    public MenuAction? PostFailureAction { get; set; }
+
     [JsonPropertyName("isActive")]
     public bool IsActive { get; set; } = true;
 
@@ -233,6 +240,12 @@ public class ExternalSystemSubmissionResult
     /// Error message if the submission failed.
     /// </summary>
     public string? ErrorMessage { get; set; }
+
+    /// <summary>
+    /// Fields extracted from the transcript, used to render success/failure TTS templates
+    /// (e.g. {{location}}, {{action}}).
+    /// </summary>
+    public Dictionary<string, string> ExtractedFields { get; set; } = new();
 
     /// <summary>
     /// Name of the external system that was called.

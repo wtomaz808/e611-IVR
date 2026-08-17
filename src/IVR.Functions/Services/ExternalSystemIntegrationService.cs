@@ -87,7 +87,8 @@ public class ExternalSystemIntegrationService
                 Success = false,
                 SystemName = externalSystem.SystemName,
                 ActionName = extractionConfig.EndpointActionName,
-                ErrorMessage = $"Could not extract required fields: {string.Join(", ", extractionResult.MissingRequiredFields)}"
+                ErrorMessage = $"Could not extract required fields: {string.Join(", ", extractionResult.MissingRequiredFields)}",
+                ExtractedFields = extractionResult.ExtractedFields
             };
         }
 
@@ -101,7 +102,9 @@ public class ExternalSystemIntegrationService
         }
 
         // Step 2: Submit to the external system
-        return await SubmitToExternalSystemAsync(externalSystem, extractionConfig.EndpointActionName, extractionResult.ExtractedFields);
+        var submissionResult = await SubmitToExternalSystemAsync(externalSystem, extractionConfig.EndpointActionName, extractionResult.ExtractedFields);
+        submissionResult.ExtractedFields = extractionResult.ExtractedFields;
+        return submissionResult;
     }
 
     /// <summary>
