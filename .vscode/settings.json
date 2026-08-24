@@ -3,5 +3,15 @@
     "azureFunctions.projectLanguage": "C#",
     "azureFunctions.projectRuntime": "~4",
     "debug.internalConsoleOptions": "neverOpen",
-    "azureFunctions.preDeployTask": "publish (functions)"
+    "azureFunctions.preDeployTask": "publish (functions)",
+    "chat.tools.terminal.autoApprove": {
+        "/^& \"\\$env:TEMP\\\\check-mcp-deploy\\.ps1\"$/": {
+            "approve": true,
+            "matchCommandLine": true
+        },
+        "/^& \"\\$env:TEMP\\\\check-admin-portal\\.ps1\"$/": {
+            "approve": true,
+            "matchCommandLine": true
+        }
+    }
 }

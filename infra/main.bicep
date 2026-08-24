@@ -35,6 +35,15 @@ param deployBotService bool = false
 @description('Override the Graph API endpoint used by the IVR Functions. Set to the PSTN simulator URL for simulator-based testing, e.g. https://<simulator-host>/graph/v1.0. Empty = use cloud default.')
 param simulatorGraphEndpoint string = ''
 
+@description('Require Entra bearer-token authentication on the MCP server endpoint. Only disable for isolated dev/test environments.')
+param mcpRequireAuthentication bool = true
+
+@description('Entra tenant ID that issues tokens for MCP callers (the Function App managed identity). Leave empty only when mcpRequireAuthentication is false.')
+param mcpTenantId string = ''
+
+@description('Entra audience (API application ID URI) the MCP server validates tokens against. Leave empty only when mcpRequireAuthentication is false.')
+param mcpAudience string = ''
+
 // ─── Naming Convention ──────────────────────────────────────────
 var uniqueSuffix = uniqueString(resourceGroup().id)
 var namePrefix = '${baseName}-${environmentName}'
@@ -121,6 +130,23 @@ module appInsights 'modules/app-insights.bicep' = {
   }
 }
 
+// ─── MCP Server (remote MCP tool host) ──────────────────────────
+// Deployed ahead of the Function App so its hostname/identity are
+// available to wire into Function App settings once Phase 3 (client
+// integration) lands. Not yet called by TeamsCallBot in this release.
+module mcpServer 'modules/mcp-server.bicep' = {
+  params: {
+    name: '${namePrefix}-mcp-${uniqueSuffix}'
+    location: location
+    tags: tags
+    cosmosDbConnectionString: keyVault.outputs.cosmosDbConnectionStringRef
+    appInsightsConnectionString: appInsights.outputs.connectionString
+    requireAuthentication: mcpRequireAuthentication
+    tenantId: mcpTenantId
+    audience: mcpAudience
+  }
+}
+
 // ─── Function App (IVR Call Handling) ───────────────────────────
 module functionApp 'modules/function-app.bicep' = {
   params: {
@@ -140,6 +166,9 @@ module functionApp 'modules/function-app.bicep' = {
     openAIKey: openAI.outputs.primaryKey
     openAIDeploymentName: openAI.outputs.deploymentName
     graphApiEndpointOverride: simulatorGraphEndpoint
+    mcpEndpoint: mcpServer.outputs.defaultHostname
+    mcpAudience: mcpAudience
+    mcpEnabled: false
   }
 }
 
@@ -164,6 +193,7 @@ module keyVaultAccess 'modules/keyvault-access.bicep' = {
     principalIds: [
       functionApp.outputs.principalId
       appService.outputs.principalId
+      mcpServer.outputs.principalId
     ]
   }
 }
@@ -196,6 +226,9 @@ output adminPortalUrl string = appService.outputs.defaultHostname
 
 @description('PSTN Simulator URL')
 output simulatorUrl string = simulatorApp.outputs.defaultHostname
+
+@description('MCP Server URL')
+output mcpServerUrl string = mcpServer.outputs.defaultHostname
 
 @description('Bot Service name — register this in Teams Admin Center')
 output botServiceName string = deployBotService ? (botService.outputs.botName ?? 'unknown') : 'create-manually-in-portal'

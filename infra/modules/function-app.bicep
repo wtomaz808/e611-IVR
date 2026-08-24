@@ -55,6 +55,15 @@ param openAIDeploymentName string
 @description('Override the Graph API endpoint. Set to the PSTN simulator URL for simulator testing (e.g. https://my-simulator.azurewebsites.us/graph/v1.0). Empty string uses the cloud-default endpoint.')
 param graphApiEndpointOverride string = ''
 
+@description('MCP server endpoint (Streamable HTTP base URL). Empty disables MCP-backed lookups.')
+param mcpEndpoint string = ''
+
+@description('Entra audience to request when acquiring a token for the MCP server')
+param mcpAudience string = ''
+
+@description('Enable MCP-backed lookups in the Function App. Requires Phase 3 client integration code.')
+param mcpEnabled bool = false
+
 // ─── Cloud-specific Bot Framework endpoints ─────────────────────
 // Azure Government (GCC High) uses separate auth and channel service
 // endpoints. These are automatically selected based on the deployment
@@ -116,8 +125,11 @@ resource functionApp 'Microsoft.Web/sites@2023-12-01' = {
         { name: 'ChannelService', value: channelService }
         { name: 'OAuthUrl', value: oAuthUrl }
         // ── Microsoft Graph API endpoint ─────────────────────────
-        { name: 'GraphApiEndpoint', value: graphApiEndpoint }
-      ]
+        { name: 'GraphApiEndpoint', value: graphApiEndpoint }        // ── MCP server (Phase 3 client integration reads these) ─────
+        { name: 'Mcp__Enabled', value: string(mcpEnabled) }
+        { name: 'Mcp__Endpoint', value: mcpEndpoint }
+        { name: 'Mcp__Audience', value: mcpAudience }
+        { name: 'Mcp__FallbackToDirect', value: 'true' }      ]
       ftpsState: 'Disabled'
       minTlsVersion: '1.2'
     }

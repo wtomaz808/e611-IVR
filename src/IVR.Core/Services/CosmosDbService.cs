@@ -18,6 +18,7 @@ public class CosmosDbService : ICosmosDbService
     private readonly Container _externalSystemContainer;
     private readonly Container _dataExtractionContainer;
     private readonly Container _phoneNumberContainer;
+    private readonly Container _eventScheduleContainer;
     private readonly ILogger<CosmosDbService> _logger;
 
     public CosmosDbService(CosmosClient cosmosClient, ILogger<CosmosDbService> logger, string databaseName = "IvrDatabase")
@@ -35,6 +36,58 @@ public class CosmosDbService : ICosmosDbService
         _externalSystemContainer = database.GetContainer("ExternalSystems");
         _dataExtractionContainer = database.GetContainer("DataExtraction");
         _phoneNumberContainer = database.GetContainer("PhoneNumbers");
+        _eventScheduleContainer = database.GetContainer("EventSchedules");
+    }
+
+    // ─── Event Schedules ─────────────────────────────────────────────
+
+    public async Task<EventSchedule?> GetEventScheduleAsync(string id)
+    {
+        try
+        {
+            var response = await _eventScheduleContainer.ReadItemAsync<EventSchedule>(id, new PartitionKey("event-schedule"));
+            return response.Resource;
+        }
+        catch (CosmosException ex) when (ex.StatusCode == System.Net.HttpStatusCode.NotFound)
+        {
+            return null;
+        }
+    }
+
+    public async Task<List<EventSchedule>> GetActiveEventSchedulesForFacilityAsync(string facilityId, string? deviceId = null)
+    {
+        var queryText = deviceId == null
+            ? "SELECT * FROM c WHERE c.isActive = true AND c.facilityId = @facilityId ORDER BY c.startTimeUtc"
+            : "SELECT * FROM c WHERE c.isActive = true AND c.facilityId = @facilityId AND (c.deviceId = @deviceId OR NOT IS_DEFINED(c.deviceId)) ORDER BY c.startTimeUtc";
+        var queryDef = new QueryDefinition(queryText).WithParameter("@facilityId", facilityId);
+        if (deviceId != null)
+        {
+            queryDef = queryDef.WithParameter("@deviceId", deviceId);
+        }
+
+        var results = new List<EventSchedule>();
+        using var iterator = _eventScheduleContainer.GetItemQueryIterator<EventSchedule>(queryDef);
+        while (iterator.HasMoreResults)
+        {
+            var response = await iterator.ReadNextAsync();
+            results.AddRange(response);
+        }
+
+        return results;
+    }
+
+    public async Task<EventSchedule> UpsertEventScheduleAsync(EventSchedule schedule)
+    {
+        schedule.UpdatedAt = DateTime.UtcNow;
+        var response = await _eventScheduleContainer.UpsertItemAsync(schedule, new PartitionKey(schedule.PartitionKey));
+        _logger.LogInformation("Upserted event schedule {Id} for facility {FacilityId}", schedule.Id, schedule.FacilityId);
+        return response.Resource;
+    }
+
+    public async Task DeleteEventScheduleAsync(string id)
+    {
+        await _eventScheduleContainer.DeleteItemAsync<EventSchedule>(id, new PartitionKey("event-schedule"));
+        _logger.LogInformation("Deleted event schedule {Id}", id);
     }
 
     // ─── ANI Records ────────────────────────────────────────────────

@@ -243,6 +243,30 @@ resource phoneNumbersContainer 'Microsoft.DocumentDB/databaseAccounts/sqlDatabas
   }
 }
 
+resource eventSchedulesContainer 'Microsoft.DocumentDB/databaseAccounts/sqlDatabases/containers@2024-02-15-preview' = {
+  parent: database
+  name: 'EventSchedules'
+  properties: {
+    resource: {
+      id: 'EventSchedules'
+      partitionKey: {
+        paths: ['/partitionKey']
+        kind: 'Hash'
+      }
+      indexingPolicy: {
+        indexingMode: 'consistent'
+        includedPaths: [
+          { path: '/facilityId/?' }
+          { path: '/deviceId/?' }
+          { path: '/isActive/?' }
+          { path: '/startTimeUtc/?' }
+        ]
+        excludedPaths: [{ path: '/*' }]
+      }
+    }
+  }
+}
+
 @description('Cosmos DB connection string')
 @secure()
 output connectionString string = cosmosAccount.listConnectionStrings().connectionStrings[0].connectionString

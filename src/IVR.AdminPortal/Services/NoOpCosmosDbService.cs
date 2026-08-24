@@ -62,4 +62,9 @@ public class NoOpCosmosDbService : ICosmosDbService
     public Task<List<PhoneNumberConfig>> GetAllPhoneNumberConfigsAsync(bool activeOnly = true) => Task.FromResult(new List<PhoneNumberConfig>());
     public Task<PhoneNumberConfig> UpsertPhoneNumberConfigAsync(PhoneNumberConfig config) => Task.FromResult(config);
     public Task DeletePhoneNumberConfigAsync(string id) => Task.CompletedTask;
+
+    public Task<EventSchedule?> GetEventScheduleAsync(string id) => Task.FromResult<EventSchedule?>(null);
+    public Task<List<EventSchedule>> GetActiveEventSchedulesForFacilityAsync(string facilityId, string? deviceId = null) => Task.FromResult(new List<EventSchedule>());
+    public Task<EventSchedule> UpsertEventScheduleAsync(EventSchedule schedule) => Task.FromResult(schedule);
+    public Task DeleteEventScheduleAsync(string id) => Task.CompletedTask;
 }

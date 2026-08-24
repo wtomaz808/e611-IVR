@@ -1,0 +1,25 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <RootNamespace>IVR.McpServer</RootNamespace>
+    <UserSecretsId>ivr-mcp-server</UserSecretsId>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- ── MCP hosting (Streamable HTTP transport) ──────────────── -->
+    <PackageReference Include="ModelContextProtocol.AspNetCore" Version="2.2.0" />
+    <!-- ── Entra token validation for the MCP endpoint ──────────── -->
+    <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="8.0.11" />
+    <!-- ── Shared services ───────────────────────────────────────── -->
+    <PackageReference Include="Microsoft.Azure.Cosmos" Version="3.37.1" />
+    <PackageReference Include="Microsoft.ApplicationInsights.AspNetCore" Version="2.22.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\IVR.Core\IVR.Core.csproj" />
+  </ItemGroup>
+
+</Project>

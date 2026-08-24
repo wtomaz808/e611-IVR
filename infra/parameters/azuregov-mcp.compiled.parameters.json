@@ -1,0 +1,42 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentParameters.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "environmentName": {
+      "value": "mcp"
+    },
+    "location": {
+      "value": "usgovvirginia"
+    },
+    "baseName": {
+      "value": "ivr"
+    },
+    "azureAdTenantId": {
+      "value": "5af05be5-b9df-43d4-8897-ec17d3118935"
+    },
+    "azureAdClientId": {
+      "value": "9fe34ecc-678c-4b44-ae0b-cbd6fca8b1d6"
+    },
+    "teamsBotAppId": {
+      "value": ""
+    },
+    "teamsBotAppPassword": {
+      "value": ""
+    },
+    "deployBotService": {
+      "value": false
+    },
+    "simulatorGraphEndpoint": {
+      "value": ""
+    },
+    "mcpRequireAuthentication": {
+      "value": true
+    },
+    "mcpTenantId": {
+      "value": "5af05be5-b9df-43d4-8897-ec17d3118935"
+    },
+    "mcpAudience": {
+      "value": "api://95213db6-3310-434e-9568-bf2489b8b3c7"
+    }
+  }
+}

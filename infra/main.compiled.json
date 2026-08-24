@@ -1,0 +1,2359 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "languageVersion": "2.0",
+  "contentVersion": "1.0.0.0",
+  "metadata": {
+    "_generator": {
+      "name": "bicep",
+      "version": "0.46.1.21595",
+      "templateHash": "14460779521684106477"
+    }
+  },
+  "parameters": {
+    "environmentName": {
+      "type": "string",
+      "metadata": {
+        "description": "Environment name (dev, staging, prod)"
+      }
+    },
+    "location": {
+      "type": "string",
+      "defaultValue": "[resourceGroup().location]",
+      "metadata": {
+        "description": "Azure region for all resources"
+      }
+    },
+    "baseName": {
+      "type": "string",
+      "defaultValue": "ivr",
+      "metadata": {
+        "description": "Base name prefix for all resources"
+      }
+    },
+    "azureAdTenantId": {
+      "type": "securestring",
+      "metadata": {
+        "description": "Admin portal Azure AD tenant ID"
+      }
+    },
+    "azureAdClientId": {
+      "type": "securestring",
+      "metadata": {
+        "description": "Admin portal Azure AD client ID"
+      }
+    },
+    "teamsBotAppId": {
+      "type": "string",
+      "metadata": {
+        "description": "Teams Calling Bot — Entra App Registration client ID. Run scripts/Create-BotAppRegistration.ps1 to generate this value."
+      }
+    },
+    "teamsBotAppPassword": {
+      "type": "securestring",
+      "metadata": {
+        "description": "Teams Calling Bot — Entra App Registration client secret"
+      }
+    },
+    "deployBotService": {
+      "type": "bool",
+      "defaultValue": false,
+      "metadata": {
+        "description": "Deploy the Azure Bot Service resource via Bicep. Set false for Azure Government subscriptions where the ARM provider returns APS errors; create the bot manually in the portal instead."
+      }
+    },
+    "simulatorGraphEndpoint": {
+      "type": "string",
+      "defaultValue": "",
+      "metadata": {
+        "description": "Override the Graph API endpoint used by the IVR Functions. Set to the PSTN simulator URL for simulator-based testing, e.g. https://<simulator-host>/graph/v1.0. Empty = use cloud default."
+      }
+    },
+    "mcpRequireAuthentication": {
+      "type": "bool",
+      "defaultValue": true,
+      "metadata": {
+        "description": "Require Entra bearer-token authentication on the MCP server endpoint. Only disable for isolated dev/test environments."
+      }
+    },
+    "mcpTenantId": {
+      "type": "string",
+      "defaultValue": "",
+      "metadata": {
+        "description": "Entra tenant ID that issues tokens for MCP callers (the Function App managed identity). Leave empty only when mcpRequireAuthentication is false."
+      }
+    },
+    "mcpAudience": {
+      "type": "string",
+      "defaultValue": "",
+      "metadata": {
+        "description": "Entra audience (API application ID URI) the MCP server validates tokens against. Leave empty only when mcpRequireAuthentication is false."
+      }
+    }
+  },
+  "variables": {
+    "uniqueSuffix": "[uniqueString(resourceGroup().id)]",
+    "namePrefix": "[format('{0}-{1}', parameters('baseName'), parameters('environmentName'))]",
+    "tags": {
+      "environment": "[parameters('environmentName')]",
+      "project": "ivr-system",
+      "managedBy": "bicep"
+    }
+  },
+  "resources": {
+    "cosmosDb": {
+      "type": "Microsoft.Resources/deployments",
+      "apiVersion": "2025-04-01",
+      "name": "[format('cosmosDb-{0}', uniqueString('cosmosDb', deployment().name))]",
+      "properties": {
+        "expressionEvaluationOptions": {
+          "scope": "inner"
+        },
+        "mode": "Incremental",
+        "parameters": {
+          "name": {
+            "value": "[format('{0}-cosmos-{1}', variables('namePrefix'), variables('uniqueSuffix'))]"
+          },
+          "location": {
+            "value": "[parameters('location')]"
+          },
+          "tags": {
+            "value": "[variables('tags')]"
+          }
+        },
+        "template": {
+          "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+          "languageVersion": "2.0",
+          "contentVersion": "1.0.0.0",
+          "metadata": {
+            "_generator": {
+              "name": "bicep",
+              "version": "0.46.1.21595",
+              "templateHash": "4605851083796141533"
+            }
+          },
+          "parameters": {
+            "name": {
+              "type": "string",
+              "metadata": {
+                "description": "Cosmos DB account name"
+              }
+            },
+            "location": {
+              "type": "string",
+              "metadata": {
+                "description": "Azure region"
+              }
+            },
+            "tags": {
+              "type": "object",
+              "metadata": {
+                "description": "Resource tags"
+              }
+            }
+          },
+          "resources": {
+            "cosmosAccount": {
+              "type": "Microsoft.DocumentDB/databaseAccounts",
+              "apiVersion": "2024-02-15-preview",
+              "name": "[parameters('name')]",
+              "location": "[parameters('location')]",
+              "tags": "[parameters('tags')]",
+              "kind": "GlobalDocumentDB",
+              "properties": {
+                "databaseAccountOfferType": "Standard",
+                "consistencyPolicy": {
+                  "defaultConsistencyLevel": "Session"
+                },
+                "locations": [
+                  {
+                    "locationName": "[parameters('location')]",
+                    "failoverPriority": 0,
+                    "isZoneRedundant": false
+                  }
+                ],
+                "capabilities": [
+                  {
+                    "name": "EnableServerless"
+                  }
+                ]
+              }
+            },
+            "database": {
+              "type": "Microsoft.DocumentDB/databaseAccounts/sqlDatabases",
+              "apiVersion": "2024-02-15-preview",
+              "name": "[format('{0}/{1}', parameters('name'), 'IvrDatabase')]",
+              "properties": {
+                "resource": {
+                  "id": "IvrDatabase"
+                }
+              },
+              "dependsOn": [
+                "cosmosAccount"
+              ]
+            },
+            "aniContainer": {
+              "type": "Microsoft.DocumentDB/databaseAccounts/sqlDatabases/containers",
+              "apiVersion": "2024-02-15-preview",
+              "name": "[format('{0}/{1}/{2}', parameters('name'), 'IvrDatabase', 'AniRecords')]",
+              "properties": {
+                "resource": {
+                  "id": "AniRecords",
+                  "partitionKey": {
+                    "paths": [
+                      "/partitionKey"
+                    ],
+                    "kind": "Hash"
+                  },
+                  "indexingPolicy": {
+                    "indexingMode": "consistent",
+                    "includedPaths": [
+                      {
+                        "path": "/phoneNumber/?"
+                      },
+                      {
+                        "path": "/callerName/?"
+                      }
+                    ],
+                    "excludedPaths": [
+                      {
+                        "path": "/*"
+                      }
+                    ]
+                  }
+                }
+              },
+              "dependsOn": [
+                "database"
+              ]
+            },
+            "aliContainer": {
+              "type": "Microsoft.DocumentDB/databaseAccounts/sqlDatabases/containers",
+              "apiVersion": "2024-02-15-preview",
+              "name": "[format('{0}/{1}/{2}', parameters('name'), 'IvrDatabase', 'AliRecords')]",
+              "properties": {
+                "resource": {
+                  "id": "AliRecords",
+                  "partitionKey": {
+                    "paths": [
+                      "/partitionKey"
+                    ],
+                    "kind": "Hash"
+                  },
+                  "indexingPolicy": {
+                    "indexingMode": "consistent",
+                    "includedPaths": [
+                      {
+                        "path": "/phoneNumber/?"
+                      },
+                      {
+                        "path": "/address/city/?"
+                      }
+                    ],
+                    "excludedPaths": [
+                      {
+                        "path": "/*"
+                      }
+                    ]
+                  }
+                }
+              },
+              "dependsOn": [
+                "database"
+              ]
+            },
+            "menusContainer": {
+              "type": "Microsoft.DocumentDB/databaseAccounts/sqlDatabases/containers",
+              "apiVersion": "2024-02-15-preview",
+              "name": "[format('{0}/{1}/{2}', parameters('name'), 'IvrDatabase', 'Menus')]",
+              "properties": {
+                "resource": {
+                  "id": "Menus",
+                  "partitionKey": {
+                    "paths": [
+                      "/partitionKey"
+                    ],
+                    "kind": "Hash"
+                  }
+                }
+              },
+              "dependsOn": [
+                "database"
+              ]
+            },
+            "promptsContainer": {
+              "type": "Microsoft.DocumentDB/databaseAccounts/sqlDatabases/containers",
+              "apiVersion": "2024-02-15-preview",
+              "name": "[format('{0}/{1}/{2}', parameters('name'), 'IvrDatabase', 'Prompts')]",
+              "properties": {
+                "resource": {
+                  "id": "Prompts",
+                  "partitionKey": {
+                    "paths": [
+                      "/partitionKey"
+                    ],
+                    "kind": "Hash"
+                  }
+                }
+              },
+              "dependsOn": [
+                "database"
+              ]
+            },
+            "callLogsContainer": {
+              "type": "Microsoft.DocumentDB/databaseAccounts/sqlDatabases/containers",
+              "apiVersion": "2024-02-15-preview",
+              "name": "[format('{0}/{1}/{2}', parameters('name'), 'IvrDatabase', 'CallLogs')]",
+              "properties": {
+                "resource": {
+                  "id": "CallLogs",
+                  "partitionKey": {
+                    "paths": [
+                      "/partitionKey"
+                    ],
+                    "kind": "Hash"
+                  },
+                  "defaultTtl": 7776000,
+                  "indexingPolicy": {
+                    "indexingMode": "consistent",
+                    "includedPaths": [
+                      {
+                        "path": "/startTime/?"
+                      },
+                      {
+                        "path": "/callerNumber/?"
+                      },
+                      {
+                        "path": "/status/?"
+                      }
+                    ],
+                    "excludedPaths": [
+                      {
+                        "path": "/*"
+                      }
+                    ]
+                  }
+                }
+              },
+              "dependsOn": [
+                "database"
+              ]
+            },
+            "configContainer": {
+              "type": "Microsoft.DocumentDB/databaseAccounts/sqlDatabases/containers",
+              "apiVersion": "2024-02-15-preview",
+              "name": "[format('{0}/{1}/{2}', parameters('name'), 'IvrDatabase', 'Config')]",
+              "properties": {
+                "resource": {
+                  "id": "Config",
+                  "partitionKey": {
+                    "paths": [
+                      "/partitionKey"
+                    ],
+                    "kind": "Hash"
+                  }
+                }
+              },
+              "dependsOn": [
+                "database"
+              ]
+            },
+            "teamRoutingContainer": {
+              "type": "Microsoft.DocumentDB/databaseAccounts/sqlDatabases/containers",
+              "apiVersion": "2024-02-15-preview",
+              "name": "[format('{0}/{1}/{2}', parameters('name'), 'IvrDatabase', 'TeamRouting')]",
+              "properties": {
+                "resource": {
+                  "id": "TeamRouting",
+                  "partitionKey": {
+                    "paths": [
+                      "/partitionKey"
+                    ],
+                    "kind": "Hash"
+                  },
+                  "indexingPolicy": {
+                    "indexingMode": "consistent",
+                    "includedPaths": [
+                      {
+                        "path": "/teamName/?"
+                      },
+                      {
+                        "path": "/isActive/?"
+                      },
+                      {
+                        "path": "/priority/?"
+                      }
+                    ],
+                    "excludedPaths": [
+                      {
+                        "path": "/*"
+                      }
+                    ]
+                  }
+                }
+              },
+              "dependsOn": [
+                "database"
+              ]
+            },
+            "externalSystemsContainer": {
+              "type": "Microsoft.DocumentDB/databaseAccounts/sqlDatabases/containers",
+              "apiVersion": "2024-02-15-preview",
+              "name": "[format('{0}/{1}/{2}', parameters('name'), 'IvrDatabase', 'ExternalSystems')]",
+              "properties": {
+                "resource": {
+                  "id": "ExternalSystems",
+                  "partitionKey": {
+                    "paths": [
+                      "/partitionKey"
+                    ],
+                    "kind": "Hash"
+                  },
+                  "indexingPolicy": {
+                    "indexingMode": "consistent",
+                    "includedPaths": [
+                      {
+                        "path": "/systemName/?"
+                      },
+                      {
+                        "path": "/isActive/?"
+                      },
+                      {
+                        "path": "/systemType/?"
+                      }
+                    ],
+                    "excludedPaths": [
+                      {
+                        "path": "/*"
+                      }
+                    ]
+                  }
+                }
+              },
+              "dependsOn": [
+                "database"
+              ]
+            },
+            "dataExtractionContainer": {
+              "type": "Microsoft.DocumentDB/databaseAccounts/sqlDatabases/containers",
+              "apiVersion": "2024-02-15-preview",
+              "name": "[format('{0}/{1}/{2}', parameters('name'), 'IvrDatabase', 'DataExtraction')]",
+              "properties": {
+                "resource": {
+                  "id": "DataExtraction",
+                  "partitionKey": {
+                    "paths": [
+                      "/partitionKey"
+                    ],
+                    "kind": "Hash"
+                  },
+                  "indexingPolicy": {
+                    "indexingMode": "consistent",
+                    "includedPaths": [
+                      {
+                        "path": "/name/?"
+                      },
+                      {
+                        "path": "/isActive/?"
+                      },
+                      {
+                        "path": "/externalSystemId/?"
+                      }
+                    ],
+                    "excludedPaths": [
+                      {
+                        "path": "/*"
+                      }
+                    ]
+                  }
+                }
+              },
+              "dependsOn": [
+                "database"
+              ]
+            },
+            "phoneNumbersContainer": {
+              "type": "Microsoft.DocumentDB/databaseAccounts/sqlDatabases/containers",
+              "apiVersion": "2024-02-15-preview",
+              "name": "[format('{0}/{1}/{2}', parameters('name'), 'IvrDatabase', 'PhoneNumbers')]",
+              "properties": {
+                "resource": {
+                  "id": "PhoneNumbers",
+                  "partitionKey": {
+                    "paths": [
+                      "/partitionKey"
+                    ],
+                    "kind": "Hash"
+                  },
+                  "indexingPolicy": {
+                    "indexingMode": "consistent",
+                    "includedPaths": [
+                      {
+                        "path": "/phoneNumber/?"
+                      },
+                      {
+                        "path": "/isActive/?"
+                      },
+                      {
+                        "path": "/numberType/?"
+                      },
+                      {
+                        "path": "/label/?"
+                      }
+                    ],
+                    "excludedPaths": [
+                      {
+                        "path": "/*"
+                      }
+                    ]
+                  }
+                }
+              },
+              "dependsOn": [
+                "database"
+              ]
+            },
+            "eventSchedulesContainer": {
+              "type": "Microsoft.DocumentDB/databaseAccounts/sqlDatabases/containers",
+              "apiVersion": "2024-02-15-preview",
+              "name": "[format('{0}/{1}/{2}', parameters('name'), 'IvrDatabase', 'EventSchedules')]",
+              "properties": {
+                "resource": {
+                  "id": "EventSchedules",
+                  "partitionKey": {
+                    "paths": [
+                      "/partitionKey"
+                    ],
+                    "kind": "Hash"
+                  },
+                  "indexingPolicy": {
+                    "indexingMode": "consistent",
+                    "includedPaths": [
+                      {
+                        "path": "/facilityId/?"
+                      },
+                      {
+                        "path": "/deviceId/?"
+                      },
+                      {
+                        "path": "/isActive/?"
+                      },
+                      {
+                        "path": "/startTimeUtc/?"
+                      }
+                    ],
+                    "excludedPaths": [
+                      {
+                        "path": "/*"
+                      }
+                    ]
+                  }
+                }
+              },
+              "dependsOn": [
+                "database"
+              ]
+            }
+          },
+          "outputs": {
+            "connectionString": {
+              "type": "securestring",
+              "metadata": {
+                "description": "Cosmos DB connection string"
+              },
+              "value": "[listConnectionStrings('cosmosAccount', '2024-02-15-preview').connectionStrings[0].connectionString]"
+            },
+            "accountName": {
+              "type": "string",
+              "metadata": {
+                "description": "Cosmos DB account name"
+              },
+              "value": "[parameters('name')]"
+            }
+          }
+        }
+      }
+    },
+    "storage": {
+      "type": "Microsoft.Resources/deployments",
+      "apiVersion": "2025-04-01",
+      "name": "[format('storage-{0}', uniqueString('storage', deployment().name))]",
+      "properties": {
+        "expressionEvaluationOptions": {
+          "scope": "inner"
+        },
+        "mode": "Incremental",
+        "parameters": {
+          "name": {
+            "value": "[format('{0}{1}stor{2}', parameters('baseName'), parameters('environmentName'), variables('uniqueSuffix'))]"
+          },
+          "location": {
+            "value": "[parameters('location')]"
+          },
+          "tags": {
+            "value": "[variables('tags')]"
+          }
+        },
+        "template": {
+          "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+          "languageVersion": "2.0",
+          "contentVersion": "1.0.0.0",
+          "metadata": {
+            "_generator": {
+              "name": "bicep",
+              "version": "0.46.1.21595",
+              "templateHash": "17076559208517097709"
+            }
+          },
+          "parameters": {
+            "name": {
+              "type": "string",
+              "metadata": {
+                "description": "Storage account name (must be globally unique, lowercase, no hyphens)"
+              }
+            },
+            "location": {
+              "type": "string",
+              "metadata": {
+                "description": "Azure region"
+              }
+            },
+            "tags": {
+              "type": "object",
+              "metadata": {
+                "description": "Resource tags"
+              }
+            }
+          },
+          "resources": {
+            "storageAccount": {
+              "type": "Microsoft.Storage/storageAccounts",
+              "apiVersion": "2023-04-01",
+              "name": "[take(replace(toLower(parameters('name')), '-', ''), 24)]",
+              "location": "[parameters('location')]",
+              "tags": "[parameters('tags')]",
+              "sku": {
+                "name": "Standard_LRS"
+              },
+              "kind": "StorageV2",
+              "properties": {
+                "supportsHttpsTrafficOnly": true,
+                "minimumTlsVersion": "TLS1_2",
+                "allowBlobPublicAccess": false
+              }
+            },
+            "blobService": {
+              "type": "Microsoft.Storage/storageAccounts/blobServices",
+              "apiVersion": "2023-04-01",
+              "name": "[format('{0}/{1}', take(replace(toLower(parameters('name')), '-', ''), 24), 'default')]",
+              "dependsOn": [
+                "storageAccount"
+              ]
+            },
+            "promptsContainer": {
+              "type": "Microsoft.Storage/storageAccounts/blobServices/containers",
+              "apiVersion": "2023-04-01",
+              "name": "[format('{0}/{1}/{2}', take(replace(toLower(parameters('name')), '-', ''), 24), 'default', 'ivr-prompts')]",
+              "properties": {
+                "publicAccess": "None"
+              },
+              "dependsOn": [
+                "blobService"
+              ]
+            }
+          },
+          "outputs": {
+            "name": {
+              "type": "string",
+              "metadata": {
+                "description": "Storage account name"
+              },
+              "value": "[take(replace(toLower(parameters('name')), '-', ''), 24)]"
+            },
+            "primaryKey": {
+              "type": "securestring",
+              "metadata": {
+                "description": "Storage account primary key"
+              },
+              "value": "[listKeys('storageAccount', '2023-04-01').keys[0].value]"
+            },
+            "connectionString": {
+              "type": "securestring",
+              "metadata": {
+                "description": "Storage account connection string"
+              },
+              "value": "[format('DefaultEndpointsProtocol=https;AccountName={0};AccountKey={1};EndpointSuffix={2}', take(replace(toLower(parameters('name')), '-', ''), 24), listKeys('storageAccount', '2023-04-01').keys[0].value, environment().suffixes.storage)]"
+            }
+          }
+        }
+      }
+    },
+    "keyVault": {
+      "type": "Microsoft.Resources/deployments",
+      "apiVersion": "2025-04-01",
+      "name": "[format('keyVault-{0}', uniqueString('keyVault', deployment().name))]",
+      "properties": {
+        "expressionEvaluationOptions": {
+          "scope": "inner"
+        },
+        "mode": "Incremental",
+        "parameters": {
+          "name": {
+            "value": "[format('{0}-kv-{1}', parameters('baseName'), variables('uniqueSuffix'))]"
+          },
+          "location": {
+            "value": "[parameters('location')]"
+          },
+          "tags": {
+            "value": "[variables('tags')]"
+          },
+          "cosmosDbConnectionString": {
+            "value": "[listOutputsWithSecureValues('cosmosDb', '2025-04-01').connectionString]"
+          }
+        },
+        "template": {
+          "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+          "contentVersion": "1.0.0.0",
+          "metadata": {
+            "_generator": {
+              "name": "bicep",
+              "version": "0.46.1.21595",
+              "templateHash": "772273362958886455"
+            }
+          },
+          "parameters": {
+            "name": {
+              "type": "string",
+              "maxLength": 24,
+              "metadata": {
+                "description": "Key Vault name (max 24 characters)"
+              }
+            },
+            "location": {
+              "type": "string",
+              "metadata": {
+                "description": "Azure region"
+              }
+            },
+            "tags": {
+              "type": "object",
+              "metadata": {
+                "description": "Resource tags"
+              }
+            },
+            "cosmosDbConnectionString": {
+              "type": "securestring",
+              "metadata": {
+                "description": "Cosmos DB connection string to store as the CosmosDbConnectionString secret"
+              }
+            }
+          },
+          "resources": [
+            {
+              "type": "Microsoft.KeyVault/vaults",
+              "apiVersion": "2023-07-01",
+              "name": "[parameters('name')]",
+              "location": "[parameters('location')]",
+              "tags": "[parameters('tags')]",
+              "properties": {
+                "sku": {
+                  "family": "A",
+                  "name": "standard"
+                },
+                "tenantId": "[subscription().tenantId]",
+                "enableRbacAuthorization": true,
+                "enableSoftDelete": true,
+                "softDeleteRetentionInDays": 90
+              }
+            },
+            {
+              "type": "Microsoft.KeyVault/vaults/secrets",
+              "apiVersion": "2023-07-01",
+              "name": "[format('{0}/{1}', parameters('name'), 'CosmosDbConnectionString')]",
+              "properties": {
+                "value": "[parameters('cosmosDbConnectionString')]"
+              },
+              "dependsOn": [
+                "[resourceId('Microsoft.KeyVault/vaults', parameters('name'))]"
+              ]
+            }
+          ],
+          "outputs": {
+            "name": {
+              "type": "string",
+              "metadata": {
+                "description": "Key Vault name"
+              },
+              "value": "[parameters('name')]"
+            },
+            "uri": {
+              "type": "string",
+              "metadata": {
+                "description": "Key Vault URI"
+              },
+              "value": "[reference(resourceId('Microsoft.KeyVault/vaults', parameters('name')), '2023-07-01').vaultUri]"
+            },
+            "cosmosDbConnectionStringRef": {
+              "type": "string",
+              "metadata": {
+                "description": "Key Vault reference string for the CosmosDbConnectionString secret, ready to use as an App Setting value"
+              },
+              "value": "[format('@Microsoft.KeyVault(SecretUri={0})', reference(resourceId('Microsoft.KeyVault/vaults/secrets', parameters('name'), 'CosmosDbConnectionString'), '2023-07-01').secretUri)]"
+            }
+          }
+        }
+      },
+      "dependsOn": [
+        "cosmosDb"
+      ]
+    },
+    "botService": {
+      "condition": "[parameters('deployBotService')]",
+      "type": "Microsoft.Resources/deployments",
+      "apiVersion": "2025-04-01",
+      "name": "[format('botService-{0}', uniqueString('botService', deployment().name))]",
+      "properties": {
+        "expressionEvaluationOptions": {
+          "scope": "inner"
+        },
+        "mode": "Incremental",
+        "parameters": {
+          "name": {
+            "value": "[format('{0}-bot-{1}', variables('namePrefix'), variables('uniqueSuffix'))]"
+          },
+          "location": {
+            "value": "[parameters('location')]"
+          },
+          "tags": {
+            "value": "[variables('tags')]"
+          },
+          "microsoftAppId": {
+            "value": "[parameters('teamsBotAppId')]"
+          },
+          "microsoftAppTenantId": {
+            "value": "[parameters('azureAdTenantId')]"
+          },
+          "messagingEndpoint": {
+            "value": "[format('https://{0}/api/bot-messages', reference('functionApp').outputs.rawHostname.value)]"
+          }
+        },
+        "template": {
+          "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+          "contentVersion": "1.0.0.0",
+          "metadata": {
+            "_generator": {
+              "name": "bicep",
+              "version": "0.46.1.21595",
+              "templateHash": "6690506392702627008"
+            }
+          },
+          "parameters": {
+            "name": {
+              "type": "string",
+              "metadata": {
+                "description": "Bot Service resource name"
+              }
+            },
+            "location": {
+              "type": "string",
+              "metadata": {
+                "description": "Azure region for other resources in the deployment (Bot Service itself is always global)"
+              }
+            },
+            "tags": {
+              "type": "object",
+              "metadata": {
+                "description": "Resource tags"
+              }
+            },
+            "microsoftAppId": {
+              "type": "string",
+              "metadata": {
+                "description": "Entra App Registration Application (client) ID for the bot"
+              }
+            },
+            "microsoftAppTenantId": {
+              "type": "string",
+              "metadata": {
+                "description": "Entra tenant ID (retained for azurebot kind upgrade path)"
+              }
+            },
+            "messagingEndpoint": {
+              "type": "string",
+              "metadata": {
+                "description": "Full HTTPS URL of the Function App bot messaging endpoint. Format: https://<functionapp>.azurewebsites.{suffix}/api/bot-messages"
+              }
+            },
+            "displayName": {
+              "type": "string",
+              "defaultValue": "IVR Calling Bot",
+              "metadata": {
+                "description": "Human-readable display name for the bot in Teams"
+              }
+            },
+            "botDescription": {
+              "type": "string",
+              "defaultValue": "E911 IVR Teams Calling Bot — routes and manages emergency calls",
+              "metadata": {
+                "description": "Bot description shown in the Teams app catalog"
+              }
+            }
+          },
+          "resources": [
+            {
+              "type": "Microsoft.BotService/botServices",
+              "apiVersion": "2022-09-15",
+              "name": "[parameters('name')]",
+              "location": "global",
+              "tags": "[parameters('tags')]",
+              "sku": {
+                "name": "S1"
+              },
+              "kind": "sdk",
+              "properties": {
+                "displayName": "[parameters('displayName')]",
+                "description": "[parameters('botDescription')]",
+                "endpoint": "[parameters('messagingEndpoint')]",
+                "msaAppId": "[parameters('microsoftAppId')]",
+                "isStreamingSupported": false
+              }
+            },
+            {
+              "type": "Microsoft.BotService/botServices/channels",
+              "apiVersion": "2022-09-15",
+              "name": "[format('{0}/{1}', parameters('name'), 'MsTeamsChannel')]",
+              "location": "global",
+              "properties": {
+                "channelName": "MsTeamsChannel",
+                "properties": {
+                  "enableCalling": true,
+                  "callingWebhook": "[parameters('messagingEndpoint')]",
+                  "isEnabled": true
+                }
+              },
+              "dependsOn": [
+                "[resourceId('Microsoft.BotService/botServices', parameters('name'))]"
+              ]
+            }
+          ],
+          "outputs": {
+            "resourceId": {
+              "type": "string",
+              "metadata": {
+                "description": "Bot Service resource ID"
+              },
+              "value": "[resourceId('Microsoft.BotService/botServices', parameters('name'))]"
+            },
+            "botName": {
+              "type": "string",
+              "metadata": {
+                "description": "Bot Service name — use when registering the bot in Teams Admin Center"
+              },
+              "value": "[parameters('name')]"
+            },
+            "microsoftAppId": {
+              "type": "string",
+              "metadata": {
+                "description": "Microsoft App ID — needed in Function App config and Teams Admin Center"
+              },
+              "value": "[parameters('microsoftAppId')]"
+            },
+            "messagingEndpoint": {
+              "type": "string",
+              "metadata": {
+                "description": "Messaging endpoint the bot is registered with"
+              },
+              "value": "[parameters('messagingEndpoint')]"
+            }
+          }
+        }
+      },
+      "dependsOn": [
+        "functionApp"
+      ]
+    },
+    "cognitiveServices": {
+      "type": "Microsoft.Resources/deployments",
+      "apiVersion": "2025-04-01",
+      "name": "[format('cognitiveServices-{0}', uniqueString('cognitiveServices', deployment().name))]",
+      "properties": {
+        "expressionEvaluationOptions": {
+          "scope": "inner"
+        },
+        "mode": "Incremental",
+        "parameters": {
+          "name": {
+            "value": "[format('{0}-speech-{1}', variables('namePrefix'), variables('uniqueSuffix'))]"
+          },
+          "location": {
+            "value": "[parameters('location')]"
+          },
+          "tags": {
+            "value": "[variables('tags')]"
+          }
+        },
+        "template": {
+          "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+          "languageVersion": "2.0",
+          "contentVersion": "1.0.0.0",
+          "metadata": {
+            "_generator": {
+              "name": "bicep",
+              "version": "0.46.1.21595",
+              "templateHash": "17630746150431212319"
+            }
+          },
+          "parameters": {
+            "name": {
+              "type": "string",
+              "metadata": {
+                "description": "Cognitive Services account name"
+              }
+            },
+            "location": {
+              "type": "string",
+              "metadata": {
+                "description": "Azure region"
+              }
+            },
+            "tags": {
+              "type": "object",
+              "metadata": {
+                "description": "Resource tags"
+              }
+            }
+          },
+          "resources": {
+            "speechAccount": {
+              "type": "Microsoft.CognitiveServices/accounts",
+              "apiVersion": "2023-10-01-preview",
+              "name": "[parameters('name')]",
+              "location": "[parameters('location')]",
+              "tags": "[parameters('tags')]",
+              "kind": "SpeechServices",
+              "sku": {
+                "name": "S0"
+              },
+              "properties": {
+                "publicNetworkAccess": "Enabled",
+                "customSubDomainName": "[parameters('name')]"
+              }
+            }
+          },
+          "outputs": {
+            "endpoint": {
+              "type": "string",
+              "metadata": {
+                "description": "Speech Services endpoint URL"
+              },
+              "value": "[reference('speechAccount').endpoint]"
+            },
+            "primaryKey": {
+              "type": "securestring",
+              "metadata": {
+                "description": "Speech Services primary key"
+              },
+              "value": "[listKeys('speechAccount', '2023-10-01-preview').key1]"
+            }
+          }
+        }
+      }
+    },
+    "openAI": {
+      "type": "Microsoft.Resources/deployments",
+      "apiVersion": "2025-04-01",
+      "name": "[format('openAI-{0}', uniqueString('openAI', deployment().name))]",
+      "properties": {
+        "expressionEvaluationOptions": {
+          "scope": "inner"
+        },
+        "mode": "Incremental",
+        "parameters": {
+          "name": {
+            "value": "[format('{0}-openai-{1}', variables('namePrefix'), variables('uniqueSuffix'))]"
+          },
+          "location": {
+            "value": "[parameters('location')]"
+          },
+          "tags": {
+            "value": "[variables('tags')]"
+          },
+          "deploymentName": {
+            "value": "gpt-41"
+          },
+          "modelName": {
+            "value": "gpt-4.1"
+          },
+          "modelVersion": {
+            "value": "2025-04-14"
+          },
+          "deploymentSku": {
+            "value": "Standard"
+          }
+        },
+        "template": {
+          "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+          "languageVersion": "2.0",
+          "contentVersion": "1.0.0.0",
+          "metadata": {
+            "_generator": {
+              "name": "bicep",
+              "version": "0.46.1.21595",
+              "templateHash": "2897135740102664406"
+            }
+          },
+          "parameters": {
+            "name": {
+              "type": "string",
+              "metadata": {
+                "description": "Azure OpenAI account name"
+              }
+            },
+            "location": {
+              "type": "string",
+              "metadata": {
+                "description": "Azure region"
+              }
+            },
+            "tags": {
+              "type": "object",
+              "metadata": {
+                "description": "Resource tags"
+              }
+            },
+            "deploymentName": {
+              "type": "string",
+              "defaultValue": "gpt-41",
+              "metadata": {
+                "description": "OpenAI model deployment name"
+              }
+            },
+            "modelName": {
+              "type": "string",
+              "defaultValue": "gpt-4.1",
+              "metadata": {
+                "description": "OpenAI model name"
+              }
+            },
+            "modelVersion": {
+              "type": "string",
+              "defaultValue": "2025-04-14",
+              "metadata": {
+                "description": "OpenAI model version"
+              }
+            },
+            "deploymentSku": {
+              "type": "string",
+              "defaultValue": "GlobalStandard",
+              "metadata": {
+                "description": "Deployment SKU — Standard for gpt-4.x, GlobalStandard for gpt-5.x"
+              }
+            }
+          },
+          "resources": {
+            "openAIAccount": {
+              "type": "Microsoft.CognitiveServices/accounts",
+              "apiVersion": "2023-10-01-preview",
+              "name": "[parameters('name')]",
+              "location": "[parameters('location')]",
+              "tags": "[parameters('tags')]",
+              "kind": "OpenAI",
+              "sku": {
+                "name": "S0"
+              },
+              "properties": {
+                "publicNetworkAccess": "Enabled",
+                "customSubDomainName": "[parameters('name')]"
+              }
+            },
+            "gptDeployment": {
+              "type": "Microsoft.CognitiveServices/accounts/deployments",
+              "apiVersion": "2023-10-01-preview",
+              "name": "[format('{0}/{1}', parameters('name'), parameters('deploymentName'))]",
+              "sku": {
+                "name": "[parameters('deploymentSku')]",
+                "capacity": 10
+              },
+              "properties": {
+                "model": {
+                  "format": "OpenAI",
+                  "name": "[parameters('modelName')]",
+                  "version": "[parameters('modelVersion')]"
+                }
+              },
+              "dependsOn": [
+                "openAIAccount"
+              ]
+            }
+          },
+          "outputs": {
+            "endpoint": {
+              "type": "string",
+              "metadata": {
+                "description": "Azure OpenAI endpoint URL"
+              },
+              "value": "[reference('openAIAccount').endpoint]"
+            },
+            "primaryKey": {
+              "type": "securestring",
+              "metadata": {
+                "description": "Azure OpenAI primary key"
+              },
+              "value": "[listKeys('openAIAccount', '2023-10-01-preview').key1]"
+            },
+            "deploymentName": {
+              "type": "string",
+              "metadata": {
+                "description": "Deployment name for use in application config"
+              },
+              "value": "[parameters('deploymentName')]"
+            }
+          }
+        }
+      }
+    },
+    "appInsights": {
+      "type": "Microsoft.Resources/deployments",
+      "apiVersion": "2025-04-01",
+      "name": "[format('appInsights-{0}', uniqueString('appInsights', deployment().name))]",
+      "properties": {
+        "expressionEvaluationOptions": {
+          "scope": "inner"
+        },
+        "mode": "Incremental",
+        "parameters": {
+          "name": {
+            "value": "[format('{0}-insights-{1}', variables('namePrefix'), variables('uniqueSuffix'))]"
+          },
+          "location": {
+            "value": "[parameters('location')]"
+          },
+          "tags": {
+            "value": "[variables('tags')]"
+          }
+        },
+        "template": {
+          "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+          "contentVersion": "1.0.0.0",
+          "metadata": {
+            "_generator": {
+              "name": "bicep",
+              "version": "0.46.1.21595",
+              "templateHash": "4824281340454389479"
+            }
+          },
+          "parameters": {
+            "name": {
+              "type": "string",
+              "metadata": {
+                "description": "Application Insights name"
+              }
+            },
+            "location": {
+              "type": "string",
+              "metadata": {
+                "description": "Azure region"
+              }
+            },
+            "tags": {
+              "type": "object",
+              "metadata": {
+                "description": "Resource tags"
+              }
+            }
+          },
+          "resources": [
+            {
+              "type": "Microsoft.OperationalInsights/workspaces",
+              "apiVersion": "2022-10-01",
+              "name": "[format('{0}-workspace', parameters('name'))]",
+              "location": "[parameters('location')]",
+              "tags": "[parameters('tags')]",
+              "properties": {
+                "sku": {
+                  "name": "PerGB2018"
+                },
+                "retentionInDays": 30
+              }
+            },
+            {
+              "type": "Microsoft.Insights/components",
+              "apiVersion": "2020-02-02",
+              "name": "[parameters('name')]",
+              "location": "[parameters('location')]",
+              "tags": "[parameters('tags')]",
+              "kind": "web",
+              "properties": {
+                "Application_Type": "web",
+                "WorkspaceResourceId": "[resourceId('Microsoft.OperationalInsights/workspaces', format('{0}-workspace', parameters('name')))]"
+              },
+              "dependsOn": [
+                "[resourceId('Microsoft.OperationalInsights/workspaces', format('{0}-workspace', parameters('name')))]"
+              ]
+            }
+          ],
+          "outputs": {
+            "connectionString": {
+              "type": "string",
+              "metadata": {
+                "description": "Application Insights connection string"
+              },
+              "value": "[reference(resourceId('Microsoft.Insights/components', parameters('name')), '2020-02-02').ConnectionString]"
+            },
+            "instrumentationKey": {
+              "type": "string",
+              "metadata": {
+                "description": "Application Insights instrumentation key"
+              },
+              "value": "[reference(resourceId('Microsoft.Insights/components', parameters('name')), '2020-02-02').InstrumentationKey]"
+            }
+          }
+        }
+      }
+    },
+    "mcpServer": {
+      "type": "Microsoft.Resources/deployments",
+      "apiVersion": "2025-04-01",
+      "name": "[format('mcpServer-{0}', uniqueString('mcpServer', deployment().name))]",
+      "properties": {
+        "expressionEvaluationOptions": {
+          "scope": "inner"
+        },
+        "mode": "Incremental",
+        "parameters": {
+          "name": {
+            "value": "[format('{0}-mcp-{1}', variables('namePrefix'), variables('uniqueSuffix'))]"
+          },
+          "location": {
+            "value": "[parameters('location')]"
+          },
+          "tags": {
+            "value": "[variables('tags')]"
+          },
+          "cosmosDbConnectionString": {
+            "value": "[reference('keyVault').outputs.cosmosDbConnectionStringRef.value]"
+          },
+          "appInsightsConnectionString": {
+            "value": "[reference('appInsights').outputs.connectionString.value]"
+          },
+          "requireAuthentication": {
+            "value": "[parameters('mcpRequireAuthentication')]"
+          },
+          "tenantId": {
+            "value": "[parameters('mcpTenantId')]"
+          },
+          "audience": {
+            "value": "[parameters('mcpAudience')]"
+          }
+        },
+        "template": {
+          "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+          "contentVersion": "1.0.0.0",
+          "metadata": {
+            "_generator": {
+              "name": "bicep",
+              "version": "0.46.1.21595",
+              "templateHash": "306009057421689318"
+            }
+          },
+          "parameters": {
+            "name": {
+              "type": "string",
+              "metadata": {
+                "description": "App Service name"
+              }
+            },
+            "location": {
+              "type": "string",
+              "metadata": {
+                "description": "Azure region"
+              }
+            },
+            "tags": {
+              "type": "object",
+              "metadata": {
+                "description": "Resource tags"
+              }
+            },
+            "cosmosDbConnectionString": {
+              "type": "securestring",
+              "metadata": {
+                "description": "Cosmos DB connection string"
+              }
+            },
+            "appInsightsConnectionString": {
+              "type": "string",
+              "metadata": {
+                "description": "App Insights connection string"
+              }
+            },
+            "requireAuthentication": {
+              "type": "bool",
+              "defaultValue": true,
+              "metadata": {
+                "description": "Require Entra bearer-token authentication on the MCP endpoint. Only disable for isolated dev/test."
+              }
+            },
+            "tenantId": {
+              "type": "string",
+              "defaultValue": "",
+              "metadata": {
+                "description": "Entra tenant ID that issues tokens for MCP callers"
+              }
+            },
+            "audience": {
+              "type": "string",
+              "defaultValue": "",
+              "metadata": {
+                "description": "Entra audience (API application ID URI) that MCP validates tokens against"
+              }
+            }
+          },
+          "resources": [
+            {
+              "type": "Microsoft.Web/serverfarms",
+              "apiVersion": "2023-12-01",
+              "name": "[format('{0}-plan', parameters('name'))]",
+              "location": "[parameters('location')]",
+              "tags": "[parameters('tags')]",
+              "sku": {
+                "name": "B1",
+                "tier": "Basic"
+              },
+              "properties": {
+                "reserved": true
+              }
+            },
+            {
+              "type": "Microsoft.Web/sites",
+              "apiVersion": "2023-12-01",
+              "name": "[parameters('name')]",
+              "location": "[parameters('location')]",
+              "tags": "[parameters('tags')]",
+              "kind": "app,linux",
+              "identity": {
+                "type": "SystemAssigned"
+              },
+              "properties": {
+                "serverFarmId": "[resourceId('Microsoft.Web/serverfarms', format('{0}-plan', parameters('name')))]",
+                "httpsOnly": true,
+                "siteConfig": {
+                  "linuxFxVersion": "DOTNETCORE|8.0",
+                  "alwaysOn": true,
+                  "appSettings": [
+                    {
+                      "name": "CosmosDbConnectionString",
+                      "value": "[parameters('cosmosDbConnectionString')]"
+                    },
+                    {
+                      "name": "APPLICATIONINSIGHTS_CONNECTION_STRING",
+                      "value": "[parameters('appInsightsConnectionString')]"
+                    },
+                    {
+                      "name": "Mcp__RequireAuthentication",
+                      "value": "[string(parameters('requireAuthentication'))]"
+                    },
+                    {
+                      "name": "Mcp__TenantId",
+                      "value": "[parameters('tenantId')]"
+                    },
+                    {
+                      "name": "Mcp__Audience",
+                      "value": "[parameters('audience')]"
+                    }
+                  ],
+                  "ftpsState": "Disabled",
+                  "minTlsVersion": "1.2"
+                }
+              },
+              "dependsOn": [
+                "[resourceId('Microsoft.Web/serverfarms', format('{0}-plan', parameters('name')))]"
+              ]
+            }
+          ],
+          "outputs": {
+            "defaultHostname": {
+              "type": "string",
+              "metadata": {
+                "description": "MCP Server default hostname (full HTTPS URL)"
+              },
+              "value": "[format('https://{0}', reference(resourceId('Microsoft.Web/sites', parameters('name')), '2023-12-01').defaultHostName)]"
+            },
+            "resourceId": {
+              "type": "string",
+              "metadata": {
+                "description": "MCP Server resource ID"
+              },
+              "value": "[resourceId('Microsoft.Web/sites', parameters('name'))]"
+            },
+            "principalId": {
+              "type": "string",
+              "metadata": {
+                "description": "System-assigned managed identity principal ID"
+              },
+              "value": "[reference(resourceId('Microsoft.Web/sites', parameters('name')), '2023-12-01', 'full').identity.principalId]"
+            }
+          }
+        }
+      },
+      "dependsOn": [
+        "appInsights",
+        "keyVault"
+      ]
+    },
+    "functionApp": {
+      "type": "Microsoft.Resources/deployments",
+      "apiVersion": "2025-04-01",
+      "name": "[format('functionApp-{0}', uniqueString('functionApp', deployment().name))]",
+      "properties": {
+        "expressionEvaluationOptions": {
+          "scope": "inner"
+        },
+        "mode": "Incremental",
+        "parameters": {
+          "name": {
+            "value": "[format('{0}-func-{1}', variables('namePrefix'), variables('uniqueSuffix'))]"
+          },
+          "location": {
+            "value": "[parameters('location')]"
+          },
+          "tags": {
+            "value": "[variables('tags')]"
+          },
+          "storageAccountName": {
+            "value": "[reference('storage').outputs.name.value]"
+          },
+          "storageAccountKey": {
+            "value": "[listOutputsWithSecureValues('storage', '2025-04-01').primaryKey]"
+          },
+          "appInsightsConnectionString": {
+            "value": "[reference('appInsights').outputs.connectionString.value]"
+          },
+          "cosmosDbConnectionString": {
+            "value": "[reference('keyVault').outputs.cosmosDbConnectionStringRef.value]"
+          },
+          "botAppId": {
+            "value": "[parameters('teamsBotAppId')]"
+          },
+          "botAppPassword": {
+            "value": "[parameters('teamsBotAppPassword')]"
+          },
+          "botTenantId": {
+            "value": "[parameters('azureAdTenantId')]"
+          },
+          "cognitiveServicesEndpoint": {
+            "value": "[reference('cognitiveServices').outputs.endpoint.value]"
+          },
+          "cognitiveServicesKey": {
+            "value": "[listOutputsWithSecureValues('cognitiveServices', '2025-04-01').primaryKey]"
+          },
+          "openAIEndpoint": {
+            "value": "[reference('openAI').outputs.endpoint.value]"
+          },
+          "openAIKey": {
+            "value": "[listOutputsWithSecureValues('openAI', '2025-04-01').primaryKey]"
+          },
+          "openAIDeploymentName": {
+            "value": "[reference('openAI').outputs.deploymentName.value]"
+          },
+          "graphApiEndpointOverride": {
+            "value": "[parameters('simulatorGraphEndpoint')]"
+          },
+          "mcpEndpoint": {
+            "value": "[reference('mcpServer').outputs.defaultHostname.value]"
+          },
+          "mcpAudience": {
+            "value": "[parameters('mcpAudience')]"
+          },
+          "mcpEnabled": {
+            "value": false
+          }
+        },
+        "template": {
+          "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+          "contentVersion": "1.0.0.0",
+          "metadata": {
+            "_generator": {
+              "name": "bicep",
+              "version": "0.46.1.21595",
+              "templateHash": "13285405321611243279"
+            }
+          },
+          "parameters": {
+            "name": {
+              "type": "string",
+              "metadata": {
+                "description": "Function App name"
+              }
+            },
+            "location": {
+              "type": "string",
+              "metadata": {
+                "description": "Azure region"
+              }
+            },
+            "tags": {
+              "type": "object",
+              "metadata": {
+                "description": "Resource tags"
+              }
+            },
+            "storageAccountName": {
+              "type": "string",
+              "metadata": {
+                "description": "Storage account name for Functions runtime"
+              }
+            },
+            "storageAccountKey": {
+              "type": "securestring",
+              "metadata": {
+                "description": "Storage account key"
+              }
+            },
+            "appInsightsConnectionString": {
+              "type": "string",
+              "metadata": {
+                "description": "App Insights connection string"
+              }
+            },
+            "cosmosDbConnectionString": {
+              "type": "securestring",
+              "metadata": {
+                "description": "Cosmos DB connection string"
+              }
+            },
+            "botAppId": {
+              "type": "string",
+              "metadata": {
+                "description": "Entra App Registration client ID for the Teams Calling Bot"
+              }
+            },
+            "botAppPassword": {
+              "type": "securestring",
+              "metadata": {
+                "description": "Entra App Registration client secret for the Teams Calling Bot"
+              }
+            },
+            "botTenantId": {
+              "type": "string",
+              "metadata": {
+                "description": "Entra tenant ID that owns the bot App Registration"
+              }
+            },
+            "cognitiveServicesEndpoint": {
+              "type": "string",
+              "metadata": {
+                "description": "Cognitive Services endpoint"
+              }
+            },
+            "cognitiveServicesKey": {
+              "type": "securestring",
+              "metadata": {
+                "description": "Cognitive Services key"
+              }
+            },
+            "openAIEndpoint": {
+              "type": "string",
+              "metadata": {
+                "description": "Azure OpenAI endpoint"
+              }
+            },
+            "openAIKey": {
+              "type": "securestring",
+              "metadata": {
+                "description": "Azure OpenAI key"
+              }
+            },
+            "openAIDeploymentName": {
+              "type": "string",
+              "metadata": {
+                "description": "Azure OpenAI deployment name"
+              }
+            },
+            "graphApiEndpointOverride": {
+              "type": "string",
+              "defaultValue": "",
+              "metadata": {
+                "description": "Override the Graph API endpoint. Set to the PSTN simulator URL for simulator testing (e.g. https://my-simulator.azurewebsites.us/graph/v1.0). Empty string uses the cloud-default endpoint."
+              }
+            },
+            "mcpEndpoint": {
+              "type": "string",
+              "defaultValue": "",
+              "metadata": {
+                "description": "MCP server endpoint (Streamable HTTP base URL). Empty disables MCP-backed lookups."
+              }
+            },
+            "mcpAudience": {
+              "type": "string",
+              "defaultValue": "",
+              "metadata": {
+                "description": "Entra audience to request when acquiring a token for the MCP server"
+              }
+            },
+            "mcpEnabled": {
+              "type": "bool",
+              "defaultValue": false,
+              "metadata": {
+                "description": "Enable MCP-backed lookups in the Function App. Requires Phase 3 client integration code."
+              }
+            }
+          },
+          "variables": {
+            "isGovCloud": "[equals(environment().name, 'AzureUSGovernment')]",
+            "channelService": "[if(variables('isGovCloud'), 'https://botframework.azure.us', '')]",
+            "oAuthUrl": "[if(variables('isGovCloud'), 'https://login.microsoftonline.us', environment().authentication.loginEndpoint)]",
+            "defaultGraphApiEndpoint": "[if(variables('isGovCloud'), 'https://graph.microsoft.us/v1.0', 'https://graph.microsoft.com/v1.0')]",
+            "graphApiEndpoint": "[if(not(empty(parameters('graphApiEndpointOverride'))), parameters('graphApiEndpointOverride'), variables('defaultGraphApiEndpoint'))]"
+          },
+          "resources": [
+            {
+              "type": "Microsoft.Web/serverfarms",
+              "apiVersion": "2023-12-01",
+              "name": "[format('{0}-plan', parameters('name'))]",
+              "location": "[parameters('location')]",
+              "tags": "[parameters('tags')]",
+              "sku": {
+                "name": "Y1",
+                "tier": "Dynamic"
+              },
+              "properties": {
+                "reserved": false
+              }
+            },
+            {
+              "type": "Microsoft.Web/sites",
+              "apiVersion": "2023-12-01",
+              "name": "[parameters('name')]",
+              "location": "[parameters('location')]",
+              "tags": "[parameters('tags')]",
+              "kind": "functionapp",
+              "identity": {
+                "type": "SystemAssigned"
+              },
+              "properties": {
+                "serverFarmId": "[resourceId('Microsoft.Web/serverfarms', format('{0}-plan', parameters('name')))]",
+                "httpsOnly": true,
+                "siteConfig": {
+                  "netFrameworkVersion": "v8.0",
+                  "appSettings": [
+                    {
+                      "name": "AzureWebJobsStorage",
+                      "value": "[format('DefaultEndpointsProtocol=https;AccountName={0};AccountKey={1};EndpointSuffix={2}', parameters('storageAccountName'), parameters('storageAccountKey'), environment().suffixes.storage)]"
+                    },
+                    {
+                      "name": "WEBSITE_CONTENTAZUREFILECONNECTIONSTRING",
+                      "value": "[format('DefaultEndpointsProtocol=https;AccountName={0};AccountKey={1};EndpointSuffix={2}', parameters('storageAccountName'), parameters('storageAccountKey'), environment().suffixes.storage)]"
+                    },
+                    {
+                      "name": "WEBSITE_CONTENTSHARE",
+                      "value": "[parameters('name')]"
+                    },
+                    {
+                      "name": "FUNCTIONS_EXTENSION_VERSION",
+                      "value": "~4"
+                    },
+                    {
+                      "name": "FUNCTIONS_WORKER_RUNTIME",
+                      "value": "dotnet-isolated"
+                    },
+                    {
+                      "name": "APPLICATIONINSIGHTS_CONNECTION_STRING",
+                      "value": "[parameters('appInsightsConnectionString')]"
+                    },
+                    {
+                      "name": "CosmosDbConnectionString",
+                      "value": "[parameters('cosmosDbConnectionString')]"
+                    },
+                    {
+                      "name": "StorageConnectionString",
+                      "value": "[format('DefaultEndpointsProtocol=https;AccountName={0};AccountKey={1};EndpointSuffix={2}', parameters('storageAccountName'), parameters('storageAccountKey'), environment().suffixes.storage)]"
+                    },
+                    {
+                      "name": "CognitiveServicesEndpoint",
+                      "value": "[parameters('cognitiveServicesEndpoint')]"
+                    },
+                    {
+                      "name": "CognitiveServicesKey",
+                      "value": "[parameters('cognitiveServicesKey')]"
+                    },
+                    {
+                      "name": "AzureOpenAI__Endpoint",
+                      "value": "[parameters('openAIEndpoint')]"
+                    },
+                    {
+                      "name": "AzureOpenAI__ApiKey",
+                      "value": "[parameters('openAIKey')]"
+                    },
+                    {
+                      "name": "AzureOpenAI__DeploymentName",
+                      "value": "[parameters('openAIDeploymentName')]"
+                    },
+                    {
+                      "name": "MicrosoftAppType",
+                      "value": "SingleTenant"
+                    },
+                    {
+                      "name": "MicrosoftAppId",
+                      "value": "[parameters('botAppId')]"
+                    },
+                    {
+                      "name": "MicrosoftAppPassword",
+                      "value": "[parameters('botAppPassword')]"
+                    },
+                    {
+                      "name": "MicrosoftAppTenantId",
+                      "value": "[parameters('botTenantId')]"
+                    },
+                    {
+                      "name": "ChannelService",
+                      "value": "[variables('channelService')]"
+                    },
+                    {
+                      "name": "OAuthUrl",
+                      "value": "[variables('oAuthUrl')]"
+                    },
+                    {
+                      "name": "GraphApiEndpoint",
+                      "value": "[variables('graphApiEndpoint')]"
+                    },
+                    {
+                      "name": "Mcp__Enabled",
+                      "value": "[string(parameters('mcpEnabled'))]"
+                    },
+                    {
+                      "name": "Mcp__Endpoint",
+                      "value": "[parameters('mcpEndpoint')]"
+                    },
+                    {
+                      "name": "Mcp__Audience",
+                      "value": "[parameters('mcpAudience')]"
+                    },
+                    {
+                      "name": "Mcp__FallbackToDirect",
+                      "value": "true"
+                    }
+                  ],
+                  "ftpsState": "Disabled",
+                  "minTlsVersion": "1.2"
+                }
+              },
+              "dependsOn": [
+                "[resourceId('Microsoft.Web/serverfarms', format('{0}-plan', parameters('name')))]"
+              ]
+            }
+          ],
+          "outputs": {
+            "defaultHostname": {
+              "type": "string",
+              "metadata": {
+                "description": "Function App default hostname (full HTTPS URL)"
+              },
+              "value": "[format('https://{0}', reference(resourceId('Microsoft.Web/sites', parameters('name')), '2023-12-01').defaultHostName)]"
+            },
+            "resourceId": {
+              "type": "string",
+              "metadata": {
+                "description": "Function App resource ID"
+              },
+              "value": "[resourceId('Microsoft.Web/sites', parameters('name'))]"
+            },
+            "rawHostname": {
+              "type": "string",
+              "metadata": {
+                "description": "Raw hostname (no scheme) — used to construct the Bot messaging endpoint"
+              },
+              "value": "[reference(resourceId('Microsoft.Web/sites', parameters('name')), '2023-12-01').defaultHostName]"
+            },
+            "principalId": {
+              "type": "string",
+              "metadata": {
+                "description": "System-assigned managed identity principal ID"
+              },
+              "value": "[reference(resourceId('Microsoft.Web/sites', parameters('name')), '2023-12-01', 'full').identity.principalId]"
+            }
+          }
+        }
+      },
+      "dependsOn": [
+        "appInsights",
+        "cognitiveServices",
+        "keyVault",
+        "mcpServer",
+        "openAI",
+        "storage"
+      ]
+    },
+    "appService": {
+      "type": "Microsoft.Resources/deployments",
+      "apiVersion": "2025-04-01",
+      "name": "[format('appService-{0}', uniqueString('appService', deployment().name))]",
+      "properties": {
+        "expressionEvaluationOptions": {
+          "scope": "inner"
+        },
+        "mode": "Incremental",
+        "parameters": {
+          "name": {
+            "value": "[format('{0}-admin-{1}', variables('namePrefix'), variables('uniqueSuffix'))]"
+          },
+          "location": {
+            "value": "[parameters('location')]"
+          },
+          "tags": {
+            "value": "[variables('tags')]"
+          },
+          "cosmosDbConnectionString": {
+            "value": "[reference('keyVault').outputs.cosmosDbConnectionStringRef.value]"
+          },
+          "storageConnectionString": {
+            "value": "[listOutputsWithSecureValues('storage', '2025-04-01').connectionString]"
+          },
+          "appInsightsConnectionString": {
+            "value": "[reference('appInsights').outputs.connectionString.value]"
+          },
+          "azureAdTenantId": {
+            "value": "[parameters('azureAdTenantId')]"
+          },
+          "azureAdClientId": {
+            "value": "[parameters('azureAdClientId')]"
+          }
+        },
+        "template": {
+          "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+          "contentVersion": "1.0.0.0",
+          "metadata": {
+            "_generator": {
+              "name": "bicep",
+              "version": "0.46.1.21595",
+              "templateHash": "12577758747235952276"
+            }
+          },
+          "parameters": {
+            "name": {
+              "type": "string",
+              "metadata": {
+                "description": "App Service name"
+              }
+            },
+            "location": {
+              "type": "string",
+              "metadata": {
+                "description": "Azure region"
+              }
+            },
+            "tags": {
+              "type": "object",
+              "metadata": {
+                "description": "Resource tags"
+              }
+            },
+            "cosmosDbConnectionString": {
+              "type": "securestring",
+              "metadata": {
+                "description": "Cosmos DB connection string"
+              }
+            },
+            "storageConnectionString": {
+              "type": "securestring",
+              "metadata": {
+                "description": "Storage account connection string"
+              }
+            },
+            "appInsightsConnectionString": {
+              "type": "string",
+              "metadata": {
+                "description": "App Insights connection string"
+              }
+            },
+            "azureAdTenantId": {
+              "type": "securestring",
+              "metadata": {
+                "description": "Azure AD tenant ID"
+              }
+            },
+            "azureAdClientId": {
+              "type": "securestring",
+              "metadata": {
+                "description": "Azure AD client ID"
+              }
+            }
+          },
+          "resources": [
+            {
+              "type": "Microsoft.Web/serverfarms",
+              "apiVersion": "2023-12-01",
+              "name": "[format('{0}-plan', parameters('name'))]",
+              "location": "[parameters('location')]",
+              "tags": "[parameters('tags')]",
+              "sku": {
+                "name": "B1",
+                "tier": "Basic"
+              },
+              "properties": {
+                "reserved": true
+              }
+            },
+            {
+              "type": "Microsoft.Web/sites",
+              "apiVersion": "2023-12-01",
+              "name": "[parameters('name')]",
+              "location": "[parameters('location')]",
+              "tags": "[parameters('tags')]",
+              "kind": "app,linux",
+              "identity": {
+                "type": "SystemAssigned"
+              },
+              "properties": {
+                "serverFarmId": "[resourceId('Microsoft.Web/serverfarms', format('{0}-plan', parameters('name')))]",
+                "httpsOnly": true,
+                "siteConfig": {
+                  "linuxFxVersion": "DOTNETCORE|8.0",
+                  "appSettings": [
+                    {
+                      "name": "CosmosDbConnectionString",
+                      "value": "[parameters('cosmosDbConnectionString')]"
+                    },
+                    {
+                      "name": "StorageConnectionString",
+                      "value": "[parameters('storageConnectionString')]"
+                    },
+                    {
+                      "name": "APPLICATIONINSIGHTS_CONNECTION_STRING",
+                      "value": "[parameters('appInsightsConnectionString')]"
+                    },
+                    {
+                      "name": "AzureAd__TenantId",
+                      "value": "[parameters('azureAdTenantId')]"
+                    },
+                    {
+                      "name": "AzureAd__ClientId",
+                      "value": "[parameters('azureAdClientId')]"
+                    },
+                    {
+                      "name": "AzureAd__Instance",
+                      "value": "[environment().authentication.loginEndpoint]"
+                    },
+                    {
+                      "name": "AzureAd__CallbackPath",
+                      "value": "/signin-oidc"
+                    }
+                  ],
+                  "ftpsState": "Disabled",
+                  "minTlsVersion": "1.2"
+                }
+              },
+              "dependsOn": [
+                "[resourceId('Microsoft.Web/serverfarms', format('{0}-plan', parameters('name')))]"
+              ]
+            }
+          ],
+          "outputs": {
+            "defaultHostname": {
+              "type": "string",
+              "metadata": {
+                "description": "Admin Portal default hostname"
+              },
+              "value": "[format('https://{0}', reference(resourceId('Microsoft.Web/sites', parameters('name')), '2023-12-01').defaultHostName)]"
+            },
+            "resourceId": {
+              "type": "string",
+              "metadata": {
+                "description": "App Service resource ID"
+              },
+              "value": "[resourceId('Microsoft.Web/sites', parameters('name'))]"
+            },
+            "planId": {
+              "type": "string",
+              "metadata": {
+                "description": "App Service Plan resource ID"
+              },
+              "value": "[resourceId('Microsoft.Web/serverfarms', format('{0}-plan', parameters('name')))]"
+            },
+            "principalId": {
+              "type": "string",
+              "metadata": {
+                "description": "System-assigned managed identity principal ID"
+              },
+              "value": "[reference(resourceId('Microsoft.Web/sites', parameters('name')), '2023-12-01', 'full').identity.principalId]"
+            }
+          }
+        }
+      },
+      "dependsOn": [
+        "appInsights",
+        "keyVault",
+        "storage"
+      ]
+    },
+    "keyVaultAccess": {
+      "type": "Microsoft.Resources/deployments",
+      "apiVersion": "2025-04-01",
+      "name": "[format('keyVaultAccess-{0}', uniqueString('keyVaultAccess', deployment().name))]",
+      "properties": {
+        "expressionEvaluationOptions": {
+          "scope": "inner"
+        },
+        "mode": "Incremental",
+        "parameters": {
+          "keyVaultName": {
+            "value": "[reference('keyVault').outputs.name.value]"
+          },
+          "principalIds": {
+            "value": [
+              "[reference('functionApp').outputs.principalId.value]",
+              "[reference('appService').outputs.principalId.value]",
+              "[reference('mcpServer').outputs.principalId.value]"
+            ]
+          }
+        },
+        "template": {
+          "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+          "contentVersion": "1.0.0.0",
+          "metadata": {
+            "_generator": {
+              "name": "bicep",
+              "version": "0.46.1.21595",
+              "templateHash": "15644053227114007850"
+            }
+          },
+          "parameters": {
+            "keyVaultName": {
+              "type": "string",
+              "metadata": {
+                "description": "Name of the existing Key Vault to grant access to"
+              }
+            },
+            "principalIds": {
+              "type": "array",
+              "metadata": {
+                "description": "Principal IDs (managed identities) to grant Key Vault Secrets User"
+              }
+            }
+          },
+          "variables": {
+            "secretsUserRoleId": "[subscriptionResourceId('Microsoft.Authorization/roleDefinitions', '4633458b-17de-408a-b874-0445c86b69e6')]"
+          },
+          "resources": [
+            {
+              "copy": {
+                "name": "secretReaderRoleAssignments",
+                "count": "[length(parameters('principalIds'))]"
+              },
+              "type": "Microsoft.Authorization/roleAssignments",
+              "apiVersion": "2022-04-01",
+              "scope": "[resourceId('Microsoft.KeyVault/vaults', parameters('keyVaultName'))]",
+              "name": "[guid(resourceId('Microsoft.KeyVault/vaults', parameters('keyVaultName')), parameters('principalIds')[copyIndex()], variables('secretsUserRoleId'))]",
+              "properties": {
+                "roleDefinitionId": "[variables('secretsUserRoleId')]",
+                "principalId": "[parameters('principalIds')[copyIndex()]]",
+                "principalType": "ServicePrincipal"
+              }
+            }
+          ]
+        }
+      },
+      "dependsOn": [
+        "appService",
+        "functionApp",
+        "keyVault",
+        "mcpServer"
+      ]
+    },
+    "simulatorApp": {
+      "type": "Microsoft.Resources/deployments",
+      "apiVersion": "2025-04-01",
+      "name": "[format('simulatorApp-{0}', uniqueString('simulatorApp', deployment().name))]",
+      "properties": {
+        "expressionEvaluationOptions": {
+          "scope": "inner"
+        },
+        "mode": "Incremental",
+        "parameters": {
+          "name": {
+            "value": "[format('{0}-simulator-{1}', variables('namePrefix'), variables('uniqueSuffix'))]"
+          },
+          "location": {
+            "value": "[parameters('location')]"
+          },
+          "tags": {
+            "value": "[variables('tags')]"
+          },
+          "appServicePlanId": {
+            "value": "[reference('appService').outputs.planId.value]"
+          },
+          "ivrEndpoint": {
+            "value": "[reference('functionApp').outputs.defaultHostname.value]"
+          },
+          "acsMode": {
+            "value": "TeamsBot"
+          }
+        },
+        "template": {
+          "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+          "contentVersion": "1.0.0.0",
+          "metadata": {
+            "_generator": {
+              "name": "bicep",
+              "version": "0.46.1.21595",
+              "templateHash": "2182200260844763722"
+            }
+          },
+          "parameters": {
+            "name": {
+              "type": "string",
+              "metadata": {
+                "description": "App Service name"
+              }
+            },
+            "location": {
+              "type": "string",
+              "metadata": {
+                "description": "Azure region"
+              }
+            },
+            "tags": {
+              "type": "object",
+              "metadata": {
+                "description": "Resource tags"
+              }
+            },
+            "appServicePlanId": {
+              "type": "string",
+              "metadata": {
+                "description": "App Service Plan resource ID (shared with admin portal)"
+              }
+            },
+            "ivrEndpoint": {
+              "type": "string",
+              "metadata": {
+                "description": "IVR Function App endpoint for callbacks"
+              }
+            },
+            "acsMode": {
+              "type": "string",
+              "defaultValue": "Mock",
+              "metadata": {
+                "description": "ACS Mode: Mock or Live"
+              }
+            },
+            "acsConnectionString": {
+              "type": "securestring",
+              "defaultValue": "",
+              "metadata": {
+                "description": "ACS connection string (optional, for Live mode)"
+              }
+            },
+            "acsCallerNumber": {
+              "type": "string",
+              "defaultValue": "",
+              "metadata": {
+                "description": "ACS caller number (optional, for Live mode)"
+              }
+            }
+          },
+          "resources": [
+            {
+              "type": "Microsoft.Web/sites",
+              "apiVersion": "2023-12-01",
+              "name": "[parameters('name')]",
+              "location": "[parameters('location')]",
+              "tags": "[parameters('tags')]",
+              "kind": "app,linux",
+              "properties": {
+                "serverFarmId": "[parameters('appServicePlanId')]",
+                "httpsOnly": true,
+                "siteConfig": {
+                  "linuxFxVersion": "DOTNETCORE|8.0",
+                  "appSettings": [
+                    {
+                      "name": "AcsMode",
+                      "value": "[parameters('acsMode')]"
+                    },
+                    {
+                      "name": "AcsConnectionString",
+                      "value": "[parameters('acsConnectionString')]"
+                    },
+                    {
+                      "name": "AcsCallerNumber",
+                      "value": "[parameters('acsCallerNumber')]"
+                    },
+                    {
+                      "name": "IvrEndpoint",
+                      "value": "[parameters('ivrEndpoint')]"
+                    }
+                  ],
+                  "ftpsState": "Disabled",
+                  "minTlsVersion": "1.2"
+                }
+              }
+            }
+          ],
+          "outputs": {
+            "defaultHostname": {
+              "type": "string",
+              "metadata": {
+                "description": "Simulator app default hostname"
+              },
+              "value": "[format('https://{0}', reference(resourceId('Microsoft.Web/sites', parameters('name')), '2023-12-01').defaultHostName)]"
+            },
+            "resourceId": {
+              "type": "string",
+              "metadata": {
+                "description": "Simulator App Service resource ID"
+              },
+              "value": "[resourceId('Microsoft.Web/sites', parameters('name'))]"
+            }
+          }
+        }
+      },
+      "dependsOn": [
+        "appService",
+        "functionApp"
+      ]
+    }
+  },
+  "outputs": {
+    "functionAppUrl": {
+      "type": "string",
+      "metadata": {
+        "description": "Function App URL for callback configuration"
+      },
+      "value": "[reference('functionApp').outputs.defaultHostname.value]"
+    },
+    "adminPortalUrl": {
+      "type": "string",
+      "metadata": {
+        "description": "Admin Portal URL"
+      },
+      "value": "[reference('appService').outputs.defaultHostname.value]"
+    },
+    "simulatorUrl": {
+      "type": "string",
+      "metadata": {
+        "description": "PSTN Simulator URL"
+      },
+      "value": "[reference('simulatorApp').outputs.defaultHostname.value]"
+    },
+    "mcpServerUrl": {
+      "type": "string",
+      "metadata": {
+        "description": "MCP Server URL"
+      },
+      "value": "[reference('mcpServer').outputs.defaultHostname.value]"
+    },
+    "botServiceName": {
+      "type": "string",
+      "metadata": {
+        "description": "Bot Service name — register this in Teams Admin Center"
+      },
+      "value": "[if(parameters('deployBotService'), coalesce(reference('botService').outputs.botName.value, 'unknown'), 'create-manually-in-portal')]"
+    },
+    "botMessagingEndpoint": {
+      "type": "string",
+      "metadata": {
+        "description": "Bot messaging endpoint — configure this in Teams Admin Center calling webhook"
+      },
+      "value": "[format('https://{0}/api/bot-messages', reference('functionApp').outputs.rawHostname.value)]"
+    }
+  }
+}

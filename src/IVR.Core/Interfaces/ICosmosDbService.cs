@@ -68,4 +68,10 @@ public interface ICosmosDbService
     Task<List<PhoneNumberConfig>> GetAllPhoneNumberConfigsAsync(bool activeOnly = true);
     Task<PhoneNumberConfig> UpsertPhoneNumberConfigAsync(PhoneNumberConfig config);
     Task DeletePhoneNumberConfigAsync(string id);
+
+    // Event Schedules (facility test/maintenance windows)
+    Task<EventSchedule?> GetEventScheduleAsync(string id);
+    Task<List<EventSchedule>> GetActiveEventSchedulesForFacilityAsync(string facilityId, string? deviceId = null);
+    Task<EventSchedule> UpsertEventScheduleAsync(EventSchedule schedule);
+    Task DeleteEventScheduleAsync(string id);
 }

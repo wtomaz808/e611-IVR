@@ -21,6 +21,7 @@ public class SeededInMemoryCosmosDbService : ICosmosDbService
     private readonly ConcurrentDictionary<string, DataExtractionConfig> _dataExtraction = new();
     private readonly ConcurrentDictionary<string, PhoneNumberConfig> _phoneNumbers = new();
     private readonly ConcurrentDictionary<string, BusinessHoursConfig> _businessHours = new();
+    private readonly ConcurrentDictionary<string, EventSchedule> _eventSchedules = new();
     private SystemConfig _systemConfig;
 
     public SeededInMemoryCosmosDbService()
@@ -1382,6 +1383,34 @@ public class SeededInMemoryCosmosDbService : ICosmosDbService
     public Task DeletePhoneNumberConfigAsync(string id)
     {
         _phoneNumbers.TryRemove(id, out _);
+        return Task.CompletedTask;
+    }
+
+    // ─── Event Schedules ─────────────────────────────────────────────
+
+    public Task<EventSchedule?> GetEventScheduleAsync(string id)
+    {
+        _eventSchedules.TryGetValue(id, out var schedule);
+        return Task.FromResult(schedule);
+    }
+
+    public Task<List<EventSchedule>> GetActiveEventSchedulesForFacilityAsync(string facilityId, string? deviceId = null)
+    {
+        var query = _eventSchedules.Values.Where(s => s.IsActive && s.FacilityId == facilityId);
+        if (deviceId != null)
+            query = query.Where(s => s.DeviceId == null || s.DeviceId == deviceId);
+        return Task.FromResult(query.OrderBy(s => s.StartTimeUtc).ToList());
+    }
+
+    public Task<EventSchedule> UpsertEventScheduleAsync(EventSchedule schedule)
+    {
+        _eventSchedules[schedule.Id] = schedule;
+        return Task.FromResult(schedule);
+    }
+
+    public Task DeleteEventScheduleAsync(string id)
+    {
+        _eventSchedules.TryRemove(id, out _);
         return Task.CompletedTask;
     }
 }
