@@ -132,8 +132,9 @@ module appInsights 'modules/app-insights.bicep' = {
 
 // ─── MCP Server (remote MCP tool host) ──────────────────────────
 // Deployed ahead of the Function App so its hostname/identity are
-// available to wire into Function App settings once Phase 3 (client
-// integration) lands. Not yet called by TeamsCallBot in this release.
+// available to wire into Function App settings. Phase 3 client
+// integration (McpGateway) is live — TeamsCallBot calls it with
+// automatic fallback to direct service calls.
 module mcpServer 'modules/mcp-server.bicep' = {
   params: {
     name: '${namePrefix}-mcp-${uniqueSuffix}'
@@ -168,7 +169,7 @@ module functionApp 'modules/function-app.bicep' = {
     graphApiEndpointOverride: simulatorGraphEndpoint
     mcpEndpoint: mcpServer.outputs.defaultHostname
     mcpAudience: mcpAudience
-    mcpEnabled: false
+    mcpEnabled: true
   }
 }
 

@@ -6,7 +6,7 @@
     "_generator": {
       "name": "bicep",
       "version": "0.46.1.21595",
-      "templateHash": "15126211284777488755"
+      "templateHash": "15043962565117369599"
     }
   },
   "parameters": {
@@ -1604,7 +1604,7 @@
             "value": "[parameters('mcpAudience')]"
           },
           "mcpEnabled": {
-            "value": false
+            "value": true
           }
         },
         "template": {
@@ -1614,7 +1614,7 @@
             "_generator": {
               "name": "bicep",
               "version": "0.46.1.21595",
-              "templateHash": "13285405321611243279"
+              "templateHash": "15510193250912583857"
             }
           },
           "parameters": {
@@ -1734,6 +1734,13 @@
               "defaultValue": false,
               "metadata": {
                 "description": "Enable MCP-backed lookups in the Function App. Requires Phase 3 client integration code."
+              }
+            },
+            "mcpRequestTimeoutSeconds": {
+              "type": "int",
+              "defaultValue": 2,
+              "metadata": {
+                "description": "Per-call timeout budget (seconds) for MCP tool calls before falling back to the direct code path."
               }
             }
           },
@@ -1870,6 +1877,10 @@
                     {
                       "name": "Mcp__FallbackToDirect",
                       "value": "true"
+                    },
+                    {
+                      "name": "Mcp__RequestTimeoutSeconds",
+                      "value": "[string(parameters('mcpRequestTimeoutSeconds'))]"
                     }
                   ],
                   "ftpsState": "Disabled",
