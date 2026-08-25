@@ -342,16 +342,89 @@ public class TeamsCallBot
         // Best-effort call-completion event — never let this affect call termination.
         try
         {
+            var details = await GatherMcpCallSummaryDetailsAsync(callLog);
+            details["disposition"] = callLog.Disposition.ToString();
+
             await _mcpGateway.RecordCallEventAsync(
                 callId,
                 eventId: $"{callId}-terminated",
                 eventType: "CallEnded",
-                details: new Dictionary<string, string> { ["disposition"] = callLog.Disposition.ToString() });
+                details: details);
         }
         catch (Exception ex)
         {
             _logger.LogWarning(ex, "Failed to record CallEnded event for {CallId}", callId);
         }
+    }
+
+    /// <summary>
+    /// Best-effort enrichment of the call-completion event using the four remaining MCP
+    /// gateway tools. Each call is independently guarded so one failure (or MCP being
+    /// disabled/unreachable) never blocks the others or call termination.
+    /// </summary>
+    private async Task<Dictionary<string, string>> GatherMcpCallSummaryDetailsAsync(CallLog callLog)
+    {
+        var details = new Dictionary<string, string>();
+
+        string? facilityName = null;
+        try
+        {
+            var facility = await _mcpGateway.FacilityRecordLookupAsync(callLog.CallerNumber);
+            if (facility.Found)
+            {
+                facilityName = facility.Facility;
+                details["mcp_facility"] = facility.Facility ?? "unknown";
+                details["mcp_callerType"] = facility.CallerType ?? "unknown";
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "MCP facility_record_lookup enrichment failed for {CallId}", callLog.CallId);
+        }
+
+        try
+        {
+            var history = await _mcpGateway.GetCallerHistoryAsync(callLog.CallerNumber, limit: 5);
+            details["mcp_priorCallCount"] = history.Count.ToString();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "MCP get_caller_history enrichment failed for {CallId}", callLog.CallId);
+        }
+
+        if (!string.IsNullOrEmpty(facilityName))
+        {
+            try
+            {
+                var schedule = await _mcpGateway.CheckEventScheduleAsync(facilityName);
+                details["mcp_scheduleMatched"] = schedule.Matched.ToString();
+                if (schedule.Matched)
+                {
+                    details["mcp_scheduleApproved"] = schedule.IsApproved.ToString();
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "MCP check_event_schedule enrichment failed for {CallId}", callLog.CallId);
+            }
+        }
+
+        var callType = callLog.DetectedIntent ?? callLog.RoutedToTeam;
+        if (!string.IsNullOrEmpty(callType))
+        {
+            try
+            {
+                var route = await _mcpGateway.RouteAdminCallAsync(callType, facilityName);
+                details["mcp_routeMatchedTeam"] = route.TeamName ?? "none";
+                details["mcp_routeEscalate"] = route.Escalate.ToString();
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "MCP route_admin_call enrichment failed for {CallId}", callLog.CallId);
+            }
+        }
+
+        return details;
     }
 
     // ─────────────────────────────────────────────────────────────────────────
