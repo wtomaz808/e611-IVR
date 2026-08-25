@@ -12,7 +12,12 @@ builder.Services.AddApplicationInsightsTelemetry();
 builder.Services
     .AddMcpServer()
     .WithHttpTransport()
-    .WithTools<FacilityTools>();
+    .WithTools<FacilityTools>()
+    .WithTools<EventScheduleTools>()
+    .WithTools<CallHistoryTools>()
+    .WithTools<CallEventTools>();
+
+builder.Services.AddSingleton<IEventScheduleEvaluationService, EventScheduleEvaluationService>();
 
 // ─── Cosmos DB (falls back to in-memory seed data, matching Function App / Admin Portal) ───
 var cosmosConnectionString = builder.Configuration["CosmosDbConnectionString"];

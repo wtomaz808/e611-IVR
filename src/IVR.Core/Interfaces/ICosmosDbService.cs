@@ -34,6 +34,12 @@ public interface ICosmosDbService
     Task<CallLog> UpdateCallLogAsync(CallLog log);
     Task<List<CallLog>> GetCallLogsAsync(DateTime? from = null, DateTime? to = null, int pageSize = 50);
     Task<CallLog?> GetCallLogByCallIdAsync(string callId);
+    Task<List<CallLog>> GetCallLogsByPhoneNumberAsync(string phoneNumber, int limit = 20, DateTime? from = null, DateTime? to = null);
+
+    // Call Events (idempotent append-only detail trail, keyed by callId + eventId)
+    Task<CallEvent?> GetCallEventAsync(string callId, string eventId);
+    Task<CallEvent> RecordCallEventAsync(CallEvent callEvent);
+    Task<List<CallEvent>> GetCallEventsForCallAsync(string callId);
 
     // Business Hours
     Task<BusinessHoursConfig?> GetBusinessHoursAsync(string? id = null);

@@ -29,7 +29,7 @@ Azure Functions remains the deterministic Teams/Graph call-control orchestrator 
 flowchart LR
     Caller[Simulator Caller] --> Simulator[PSTN Simulator]
     Simulator --> Function[IVR Function App]
-    Function -- MCP tool call --Streamable HTTP + bearer token--> MCP[MCP Server]
+    Function -->|MCP tool call: Streamable HTTP + bearer token| MCP[MCP Server]
     MCP --> Cosmos[(Cosmos DB)]
     MCP --> External[Configured External Systems]
     Function --> OpenAI[Azure OpenAI]
@@ -50,10 +50,10 @@ flowchart LR
 | Tool | Status | Backing behavior | Input → Output |
 |---|---|---|---|
 | `facility_record_lookup` | **Implemented** (`FacilityTools.cs`) | ANI/ALI lookup | Phone number → facility, location, contact, block status |
+| `check_event_schedule` | **Implemented** (`EventScheduleTools.cs`) | `EventScheduleEvaluationService` over the `EventSchedules` container | Facility/device + event time → matching window, approval, contact |
+| `get_caller_history` | **Implemented** (`CallHistoryTools.cs`) | Bounded, phone-scoped call-log query | Phone number + limit/date range → summary records (no transcripts) |
+| `record_call_event` | **Implemented** (`CallEventTools.cs`) | Idempotent create against the new `CallEvents` container (keyed by callId + eventId) | Call ID, event ID, type, timestamp, details → acknowledgment + `alreadyRecorded` flag |
 | `route_admin_call` | Planned | Business hours, menu, team-routing rules | Call type + facility context → route action/target/escalation |
-| `check_event_schedule` | Planned | Event schedule service (new `EventSchedules` container) | Facility/device + event time → matching window, approval, contact |
-| `get_caller_history` | Planned | Bounded call-log query | Phone number + limit/date range → summary records (no transcripts by default) |
-| `record_call_event` | Planned | Idempotent call-log create/update | Call ID, event ID, type, timestamp, details → acknowledgment + version |
 
 All tools follow the same rules: explicit request/response records, schema validation, cancellation tokens, bounded result sizes, structured errors, and tool descriptions that state when the tool should and should not be called. Sensitive fields (credentials, full transcripts) never appear in tool descriptions, logs, or error payloads.
 
@@ -66,7 +66,7 @@ sequenceDiagram
     participant Func as Function App (managed identity)
     participant Entra as Microsoft Entra ID
     participant MCP as MCP Server (/mcp)
-    Func->>Entra: Request token for audience api://<mcp-app-id>
+    Func->>Entra: Request token for audience api://mcp-app-id
     Entra-->>Func: Bearer token (tenant-scoped)
     Func->>MCP: POST /mcp  (Authorization: Bearer <token>)
     MCP->>MCP: Validate issuer, audience, lifetime (JwtBearer)
@@ -125,11 +125,13 @@ Point a local Function App instance at it with `Mcp__Endpoint=http://localhost:5
 
 ## 8. Current Status vs. Plan
 
-As of 2026-08-24, `rg-ivr-Mcp` is deployed and all four apps (Function App, MCP server, Admin Portal, Simulator) are running with real code — verified via Kudu file listing and HTTP health checks. What remains before Phase 6/7 acceptance testing, per [the deployment plan](mcp-integration-deployment-plan.md):
+As of 2026-08-24, `rg-ivr-Mcp` is deployed and all four apps (Function App, MCP server, Admin Portal, Simulator) are running with real code — verified via Kudu file listing and HTTP health checks. Four of the five planned tools are now implemented (`facility_record_lookup`, `check_event_schedule`, `get_caller_history`, `record_call_event`); the new `CallEvents` container needs a Bicep redeploy of `rg-ivr-Mcp` before `record_call_event` will work against live Cosmos DB (it currently falls back to in-memory when no connection string is configured). What remains before Phase 6/7 acceptance testing, per [the deployment plan](mcp-integration-deployment-plan.md):
 
-- Implement `route_admin_call`, `check_event_schedule`, `get_caller_history`, `record_call_event` (only `facility_record_lookup` exists today).
+- Implement `route_admin_call` — blocked on deciding how `CallFlowEngine`/`TranscriptRoutingService` logic (currently `IVR.Functions`-only) becomes reachable from the MCP server; current direction is a new authenticated endpoint on the Function App that the tool calls, rather than moving the logic into `IVR.Core`.
+- Redeploy `rg-ivr-Mcp` infrastructure (new `CallEvents` container) and the MCP server app code.
 - Build the Function App's MCP gateway/client and flip `Mcp__Enabled` to `true` with fallback instrumentation.
 - Add `EventSchedules` management to the Admin Portal and matching Data Seeder records.
 - Add the MCP server to `docker-compose.yml` for local integration testing.
 - Add unit/protocol-level tests and snapshot-test tool schemas.
 - Run simulator acceptance tests (facility lookup, scheduled/unscheduled test, routing, history, event recording) before any Teams integration (Phase 8).
+

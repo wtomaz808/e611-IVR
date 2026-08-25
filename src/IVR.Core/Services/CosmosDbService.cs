@@ -19,6 +19,7 @@ public class CosmosDbService : ICosmosDbService
     private readonly Container _dataExtractionContainer;
     private readonly Container _phoneNumberContainer;
     private readonly Container _eventScheduleContainer;
+    private readonly Container _callEventContainer;
     private readonly ILogger<CosmosDbService> _logger;
 
     public CosmosDbService(CosmosClient cosmosClient, ILogger<CosmosDbService> logger, string databaseName = "IvrDatabase")
@@ -37,6 +38,7 @@ public class CosmosDbService : ICosmosDbService
         _dataExtractionContainer = database.GetContainer("DataExtraction");
         _phoneNumberContainer = database.GetContainer("PhoneNumbers");
         _eventScheduleContainer = database.GetContainer("EventSchedules");
+        _callEventContainer = database.GetContainer("CallEvents");
     }
 
     // ─── Event Schedules ─────────────────────────────────────────────
@@ -333,6 +335,74 @@ public class CosmosDbService : ICosmosDbService
             return response.FirstOrDefault();
         }
         return null;
+    }
+
+    public async Task<List<CallLog>> GetCallLogsByPhoneNumberAsync(string phoneNumber, int limit = 20, DateTime? from = null, DateTime? to = null)
+    {
+        from ??= DateTime.UtcNow.AddDays(-90);
+        to ??= DateTime.UtcNow;
+
+        var queryDef = new QueryDefinition(
+            "SELECT * FROM c WHERE c.callerNumber = @phoneNumber AND c.startTime >= @from AND c.startTime <= @to ORDER BY c.startTime DESC")
+            .WithParameter("@phoneNumber", phoneNumber)
+            .WithParameter("@from", from)
+            .WithParameter("@to", to);
+
+        var results = new List<CallLog>();
+        using var iterator = _callLogContainer.GetItemQueryIterator<CallLog>(queryDef,
+            requestOptions: new QueryRequestOptions { MaxItemCount = limit });
+
+        if (iterator.HasMoreResults)
+        {
+            var response = await iterator.ReadNextAsync();
+            results.AddRange(response);
+        }
+        return results;
+    }
+
+    // ─── Call Events ────────────────────────────────────────────────
+
+    public async Task<CallEvent?> GetCallEventAsync(string callId, string eventId)
+    {
+        try
+        {
+            var response = await _callEventContainer.ReadItemAsync<CallEvent>(eventId, new PartitionKey(callId));
+            return response.Resource;
+        }
+        catch (CosmosException ex) when (ex.StatusCode == System.Net.HttpStatusCode.NotFound)
+        {
+            return null;
+        }
+    }
+
+    public async Task<CallEvent> RecordCallEventAsync(CallEvent callEvent)
+    {
+        try
+        {
+            var response = await _callEventContainer.CreateItemAsync(callEvent, new PartitionKey(callEvent.PartitionKey));
+            return response.Resource;
+        }
+        catch (CosmosException ex) when (ex.StatusCode == System.Net.HttpStatusCode.Conflict)
+        {
+            // Same eventId already recorded for this call — idempotent no-op, return the existing record.
+            var existing = await GetCallEventAsync(callEvent.CallId, callEvent.Id);
+            return existing ?? callEvent;
+        }
+    }
+
+    public async Task<List<CallEvent>> GetCallEventsForCallAsync(string callId)
+    {
+        var queryDef = new QueryDefinition("SELECT * FROM c WHERE c.callId = @callId ORDER BY c.timestampUtc")
+            .WithParameter("@callId", callId);
+
+        var results = new List<CallEvent>();
+        using var iterator = _callEventContainer.GetItemQueryIterator<CallEvent>(queryDef, requestOptions: new QueryRequestOptions { PartitionKey = new PartitionKey(callId) });
+        while (iterator.HasMoreResults)
+        {
+            var response = await iterator.ReadNextAsync();
+            results.AddRange(response);
+        }
+        return results;
     }
 
     // ─── Business Hours ─────────────────────────────────────────────

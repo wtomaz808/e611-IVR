@@ -22,6 +22,7 @@ public class SeededInMemoryCosmosDbService : ICosmosDbService
     private readonly ConcurrentDictionary<string, PhoneNumberConfig> _phoneNumbers = new();
     private readonly ConcurrentDictionary<string, BusinessHoursConfig> _businessHours = new();
     private readonly ConcurrentDictionary<string, EventSchedule> _eventSchedules = new();
+    private readonly ConcurrentDictionary<string, CallEvent> _callEvents = new();
     private SystemConfig _systemConfig;
 
     public SeededInMemoryCosmosDbService()
@@ -1245,6 +1246,35 @@ public class SeededInMemoryCosmosDbService : ICosmosDbService
     {
         var log = _callLogs.Values.FirstOrDefault(c => c.CallId == callId);
         return Task.FromResult(log);
+    }
+
+    public Task<List<CallLog>> GetCallLogsByPhoneNumberAsync(string phoneNumber, int limit = 20, DateTime? from = null, DateTime? to = null)
+    {
+        var query = _callLogs.Values.Where(c => c.CallerNumber == phoneNumber);
+        if (from.HasValue)
+            query = query.Where(c => c.StartTime >= from.Value);
+        if (to.HasValue)
+            query = query.Where(c => c.StartTime <= to.Value);
+        return Task.FromResult(query.OrderByDescending(c => c.StartTime).Take(limit).ToList());
+    }
+
+    // ─── Call Events ────────────────────────────────────────────────
+
+    public Task<CallEvent?> GetCallEventAsync(string callId, string eventId)
+    {
+        _callEvents.TryGetValue(eventId, out var callEvent);
+        return Task.FromResult(callEvent != null && callEvent.CallId == callId ? callEvent : null);
+    }
+
+    public Task<CallEvent> RecordCallEventAsync(CallEvent callEvent)
+    {
+        var stored = _callEvents.GetOrAdd(callEvent.Id, callEvent);
+        return Task.FromResult(stored);
+    }
+
+    public Task<List<CallEvent>> GetCallEventsForCallAsync(string callId)
+    {
+        return Task.FromResult(_callEvents.Values.Where(e => e.CallId == callId).OrderBy(e => e.TimestampUtc).ToList());
     }
 
     // ─── Business Hours ──────────────────────────────────────────

@@ -34,6 +34,11 @@ public class NoOpCosmosDbService : ICosmosDbService
     public Task<CallLog> UpdateCallLogAsync(CallLog log) => Task.FromResult(log);
     public Task<List<CallLog>> GetCallLogsAsync(DateTime? from = null, DateTime? to = null, int pageSize = 50) => Task.FromResult(new List<CallLog>());
     public Task<CallLog?> GetCallLogByCallIdAsync(string callId) => Task.FromResult<CallLog?>(null);
+    public Task<List<CallLog>> GetCallLogsByPhoneNumberAsync(string phoneNumber, int limit = 20, DateTime? from = null, DateTime? to = null) => Task.FromResult(new List<CallLog>());
+
+    public Task<CallEvent?> GetCallEventAsync(string callId, string eventId) => Task.FromResult<CallEvent?>(null);
+    public Task<CallEvent> RecordCallEventAsync(CallEvent callEvent) => Task.FromResult(callEvent);
+    public Task<List<CallEvent>> GetCallEventsForCallAsync(string callId) => Task.FromResult(new List<CallEvent>());
 
     public Task<BusinessHoursConfig?> GetBusinessHoursAsync(string? id = null) => Task.FromResult<BusinessHoursConfig?>(null);
     public Task<BusinessHoursConfig> UpsertBusinessHoursAsync(BusinessHoursConfig config) => Task.FromResult(config);

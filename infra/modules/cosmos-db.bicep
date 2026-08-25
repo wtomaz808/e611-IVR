@@ -267,6 +267,33 @@ resource eventSchedulesContainer 'Microsoft.DocumentDB/databaseAccounts/sqlDatab
   }
 }
 
+resource callEventsContainer 'Microsoft.DocumentDB/databaseAccounts/sqlDatabases/containers@2024-02-15-preview' = {
+  parent: database
+  name: 'CallEvents'
+  properties: {
+    resource: {
+      id: 'CallEvents'
+      // Partitioned by callId (not the generic /partitionKey) so events for a call are
+      // co-located and RecordCallEventAsync's create-conflict idempotency check is a
+      // single-partition point read.
+      partitionKey: {
+        paths: ['/callId']
+        kind: 'Hash'
+      }
+      defaultTtl: 7776000 // 90 days, matches CallLogs retention
+      indexingPolicy: {
+        indexingMode: 'consistent'
+        includedPaths: [
+          { path: '/callId/?' }
+          { path: '/eventType/?' }
+          { path: '/timestampUtc/?' }
+        ]
+        excludedPaths: [{ path: '/*' }]
+      }
+    }
+  }
+}
+
 @description('Cosmos DB connection string')
 @secure()
 output connectionString string = cosmosAccount.listConnectionStrings().connectionStrings[0].connectionString
