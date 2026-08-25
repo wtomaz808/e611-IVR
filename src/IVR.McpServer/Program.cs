@@ -15,9 +15,11 @@ builder.Services
     .WithTools<FacilityTools>()
     .WithTools<EventScheduleTools>()
     .WithTools<CallHistoryTools>()
-    .WithTools<CallEventTools>();
+    .WithTools<CallEventTools>()
+    .WithTools<AdminCallRoutingTools>();
 
 builder.Services.AddSingleton<IEventScheduleEvaluationService, EventScheduleEvaluationService>();
+builder.Services.AddSingleton<IAdminCallRoutingService, AdminCallRoutingService>();
 
 // ─── Cosmos DB (falls back to in-memory seed data, matching Function App / Admin Portal) ───
 var cosmosConnectionString = builder.Configuration["CosmosDbConnectionString"];

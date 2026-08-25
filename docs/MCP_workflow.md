@@ -2,7 +2,7 @@
 
 This document describes how the Model Context Protocol (MCP) server fits into the IVR call flow, how it is secured, and what it currently does versus what the [MCP Integration and Deployment Plan](mcp-integration-deployment-plan.md) still calls for.
 
-**Branch:** `MCP_integration` · **Resource group:** `rg-ivr-Mcp` (US Gov Virginia) · **Status:** Infrastructure and a first tool slice deployed; Function App client integration not yet enabled.
+**Branch:** `MCP_integration` · **Resource group:** `rg-ivr-Mcp` (US Gov Virginia) · **Status:** Infrastructure deployed; all 5 planned tools implemented; Function App client integration not yet enabled.
 
 ---
 
@@ -53,7 +53,7 @@ flowchart LR
 | `check_event_schedule` | **Implemented** (`EventScheduleTools.cs`) | `EventScheduleEvaluationService` over the `EventSchedules` container | Facility/device + event time → matching window, approval, contact |
 | `get_caller_history` | **Implemented** (`CallHistoryTools.cs`) | Bounded, phone-scoped call-log query | Phone number + limit/date range → summary records (no transcripts) |
 | `record_call_event` | **Implemented** (`CallEventTools.cs`) | Idempotent create against the new `CallEvents` container (keyed by callId + eventId) | Call ID, event ID, type, timestamp, details → acknowledgment + `alreadyRecorded` flag |
-| `route_admin_call` | Planned | Business hours, menu, team-routing rules | Call type + facility context → route action/target/escalation |
+| `route_admin_call` | **Implemented** (`AdminCallRoutingTools.cs`) | `AdminCallRoutingService` — keyword-matches `TeamRoutingConfig` + `BusinessHoursConfig.IsCurrentlyOpen()` (both already shared in `IVR.Core`) | Call type + facility context → matched team, transfer target, business-hours flag, escalate flag |
 
 All tools follow the same rules: explicit request/response records, schema validation, cancellation tokens, bounded result sizes, structured errors, and tool descriptions that state when the tool should and should not be called. Sensitive fields (credentials, full transcripts) never appear in tool descriptions, logs, or error payloads.
 
@@ -125,13 +125,13 @@ Point a local Function App instance at it with `Mcp__Endpoint=http://localhost:5
 
 ## 8. Current Status vs. Plan
 
-As of 2026-08-24, `rg-ivr-Mcp` is deployed and all four apps (Function App, MCP server, Admin Portal, Simulator) are running with real code — verified via Kudu file listing and HTTP health checks. Four of the five planned tools are now implemented (`facility_record_lookup`, `check_event_schedule`, `get_caller_history`, `record_call_event`); the new `CallEvents` container needs a Bicep redeploy of `rg-ivr-Mcp` before `record_call_event` will work against live Cosmos DB (it currently falls back to in-memory when no connection string is configured). What remains before Phase 6/7 acceptance testing, per [the deployment plan](mcp-integration-deployment-plan.md):
+As of 2026-08-24, `rg-ivr-Mcp` is deployed and all four apps (Function App, MCP server, Admin Portal, Simulator) are running with real code — verified via Kudu file listing and HTTP health checks. All 5 planned tools are now implemented (`facility_record_lookup`, `check_event_schedule`, `get_caller_history`, `record_call_event`, `route_admin_call`). `route_admin_call` turned out not to need `CallFlowEngine`/`TranscriptRoutingService` (those stay `IVR.Functions`-only, untouched) — it's new, purely deterministic keyword/business-hours logic that only needed interfaces already shared in `IVR.Core`. The new `CallEvents` container needs a Bicep redeploy of `rg-ivr-Mcp` before `record_call_event` will work against live Cosmos DB (it currently falls back to in-memory when no connection string is configured). What remains before Phase 6/7 acceptance testing, per [the deployment plan](mcp-integration-deployment-plan.md):
 
-- Implement `route_admin_call` — blocked on deciding how `CallFlowEngine`/`TranscriptRoutingService` logic (currently `IVR.Functions`-only) becomes reachable from the MCP server; current direction is a new authenticated endpoint on the Function App that the tool calls, rather than moving the logic into `IVR.Core`.
 - Redeploy `rg-ivr-Mcp` infrastructure (new `CallEvents` container) and the MCP server app code.
 - Build the Function App's MCP gateway/client and flip `Mcp__Enabled` to `true` with fallback instrumentation.
 - Add `EventSchedules` management to the Admin Portal and matching Data Seeder records.
 - Add the MCP server to `docker-compose.yml` for local integration testing.
 - Add unit/protocol-level tests and snapshot-test tool schemas.
 - Run simulator acceptance tests (facility lookup, scheduled/unscheduled test, routing, history, event recording) before any Teams integration (Phase 8).
+
 
