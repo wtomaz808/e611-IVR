@@ -1,6 +1,7 @@
 using IVR.Core.Interfaces;
 using IVR.Core.Models;
 using IVR.Functions.Services;
+using IVR.Functions.Services.Mcp;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Azure.Functions.Worker;
@@ -55,6 +56,7 @@ public class TeamsCallBot
     private readonly TranscriptRoutingService _transcriptRouting;
     private readonly ExternalSystemIntegrationService _externalIntegration;
     private readonly ICosmosDbService _cosmosDb;
+    private readonly IMcpGateway _mcpGateway;
     private readonly IHttpClientFactory _httpClientFactory;
     private readonly string _callbackUri;
     private readonly ILogger<TeamsCallBot> _logger;
@@ -78,6 +80,7 @@ public class TeamsCallBot
         TranscriptRoutingService transcriptRouting,
         ExternalSystemIntegrationService externalIntegration,
         ICosmosDbService cosmosDb,
+        IMcpGateway mcpGateway,
         IHttpClientFactory httpClientFactory,
         IConfiguration configuration,
         ILogger<TeamsCallBot> logger)
@@ -91,6 +94,7 @@ public class TeamsCallBot
         _transcriptRouting   = transcriptRouting;
         _externalIntegration = externalIntegration;
         _cosmosDb            = cosmosDb;
+        _mcpGateway          = mcpGateway;
         _httpClientFactory   = httpClientFactory;
         _logger              = logger;
         _callbackUri         = configuration["BotMessagingEndpoint"]
@@ -334,6 +338,20 @@ public class TeamsCallBot
         callLog.EndTime = DateTime.UtcNow;
         callLog.DurationSeconds = (callLog.EndTime.Value - callLog.StartTime).TotalSeconds;
         await _cosmosDb.UpdateCallLogAsync(callLog);
+
+        // Best-effort call-completion event — never let this affect call termination.
+        try
+        {
+            await _mcpGateway.RecordCallEventAsync(
+                callId,
+                eventId: $"{callId}-terminated",
+                eventType: "CallEnded",
+                details: new Dictionary<string, string> { ["disposition"] = callLog.Disposition.ToString() });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to record CallEnded event for {CallId}", callId);
+        }
     }
 
     // ─────────────────────────────────────────────────────────────────────────

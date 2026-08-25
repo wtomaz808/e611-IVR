@@ -4,6 +4,7 @@ using Azure.Storage.Blobs;
 using IVR.Core.Interfaces;
 using IVR.Core.Services;
 using IVR.Functions.Services;
+using IVR.Functions.Services.Mcp;
 using Microsoft.Azure.Cosmos;
 using Microsoft.Azure.Functions.Worker;
 using Microsoft.Extensions.DependencyInjection;
@@ -133,6 +134,31 @@ var host = new HostBuilder()
         services.AddSingleton<PromptService>();
         services.AddSingleton<TtsGenerationService>();
         services.AddSingleton<TranscriptRoutingService>();
+
+        // ─── MCP gateway (calls IVR.McpServer; falls back to direct calls) ─
+        // Domain services shared with the MCP server — used for the direct-fallback
+        // path so `check_event_schedule`/`route_admin_call` logic isn't duplicated.
+        services.AddSingleton<IEventScheduleEvaluationService, EventScheduleEvaluationService>();
+        services.AddSingleton<IAdminCallRoutingService, AdminCallRoutingService>();
+
+        services.AddSingleton(sp =>
+        {
+            var config = sp.GetRequiredService<Microsoft.Extensions.Configuration.IConfiguration>();
+            return new McpGatewayOptions
+            {
+                Enabled = bool.TryParse(config["Mcp:Enabled"], out var enabled) && enabled,
+                Endpoint = config["Mcp:Endpoint"] ?? string.Empty,
+                Audience = config["Mcp:Audience"] ?? string.Empty,
+                FallbackToDirect = !bool.TryParse(config["Mcp:FallbackToDirect"], out var fallback) || fallback,
+                RequestTimeoutSeconds = int.TryParse(config["Mcp:RequestTimeoutSeconds"], out var timeout) ? timeout : 2,
+                IsGovCloud = isGovCloud
+            };
+        });
+        services.AddSingleton<Azure.Core.TokenCredential>(_ => new DefaultAzureCredential(new DefaultAzureCredentialOptions
+        {
+            AuthorityHost = isGovCloud ? AzureAuthorityHosts.AzureGovernment : AzureAuthorityHosts.AzurePublicCloud
+        }));
+        services.AddSingleton<IMcpGateway, McpGateway>();
 
         // HTTP client factory for external system integrations
         services.AddHttpClient("ExternalSystems", client =>

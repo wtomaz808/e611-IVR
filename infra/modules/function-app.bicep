@@ -64,6 +64,9 @@ param mcpAudience string = ''
 @description('Enable MCP-backed lookups in the Function App. Requires Phase 3 client integration code.')
 param mcpEnabled bool = false
 
+@description('Per-call timeout budget (seconds) for MCP tool calls before falling back to the direct code path.')
+param mcpRequestTimeoutSeconds int = 2
+
 // ─── Cloud-specific Bot Framework endpoints ─────────────────────
 // Azure Government (GCC High) uses separate auth and channel service
 // endpoints. These are automatically selected based on the deployment
@@ -125,11 +128,14 @@ resource functionApp 'Microsoft.Web/sites@2023-12-01' = {
         { name: 'ChannelService', value: channelService }
         { name: 'OAuthUrl', value: oAuthUrl }
         // ── Microsoft Graph API endpoint ─────────────────────────
-        { name: 'GraphApiEndpoint', value: graphApiEndpoint }        // ── MCP server (Phase 3 client integration reads these) ─────
+        { name: 'GraphApiEndpoint', value: graphApiEndpoint }
+        // ── MCP server (Phase 3 client integration) ──────────────
         { name: 'Mcp__Enabled', value: string(mcpEnabled) }
         { name: 'Mcp__Endpoint', value: mcpEndpoint }
         { name: 'Mcp__Audience', value: mcpAudience }
-        { name: 'Mcp__FallbackToDirect', value: 'true' }      ]
+        { name: 'Mcp__FallbackToDirect', value: 'true' }
+        { name: 'Mcp__RequestTimeoutSeconds', value: string(mcpRequestTimeoutSeconds) }
+      ]
       ftpsState: 'Disabled'
       minTlsVersion: '1.2'
     }

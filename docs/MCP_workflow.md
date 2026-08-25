@@ -107,10 +107,13 @@ The MCP environment is a fully isolated stack in `rg-ivr-Mcp` — it does **not*
 
 | Setting | Purpose | Current value |
 |---|---|---|
-| `Mcp__Enabled` | Turns on MCP-backed lookups | `false` — client integration (Phase 3) not yet implemented |
+| `Mcp__Enabled` | Turns on MCP-backed lookups (`McpGateway`, `IVR.Functions/Services/Mcp/`) | `false` by default — flip to `true` and redeploy to route calls through MCP |
 | `Mcp__Endpoint` | MCP server base URL | Set from `mcpServer.outputs.defaultHostname` |
 | `Mcp__Audience` | Token audience to request | From `mcpAudience` parameter |
 | `Mcp__FallbackToDirect` | Preserve direct-service code path during migration | `true` |
+| `Mcp__RequestTimeoutSeconds` | Per-call timeout before falling back | `2` (tune from telemetry) |
+
+`McpGateway` acquires a managed-identity token (`DefaultAzureCredential`, Gov authority auto-selected) via `Azure.Core.TokenCredential`, caches an `McpClient` (Streamable HTTP) until ~2 minutes before token expiry, and calls each tool by name. On any failure, timeout, or `Mcp__Enabled=false`, it falls back to the same domain services/`ICosmosDbService` calls the MCP server's own tools use — `check_event_schedule`/`route_admin_call` reuse the exact `IVR.Core` service in-process, so there's no separate fallback implementation to drift out of sync for those two. Currently wired into `TeamsCallBot.HandleCallTerminatedAsync` (records a best-effort `CallEnded` event); the other four gateway methods are ready to call from additional call-flow sites as those integrations are added.
 
 ## 7. Local Development
 
@@ -121,17 +124,17 @@ cd src/IVR.McpServer
 dotnet run --Mcp:RequireAuthentication=false   # loopback-only, no Entra token needed
 ```
 
-Point a local Function App instance at it with `Mcp__Endpoint=http://localhost:5000` and `Mcp__Enabled=true` once the Phase 3 client lands.
+Point a local Function App instance at it with `Mcp__Endpoint=http://localhost:5000` and `Mcp__Enabled=true` once the MCP server is added to Docker Compose (currently only supported by pointing a Function App at the deployed `rg-ivr-Mcp` MCP server).
 
 ## 8. Current Status vs. Plan
 
-As of 2026-08-24, `rg-ivr-Mcp` is deployed and all four apps (Function App, MCP server, Admin Portal, Simulator) are running with real code — verified via Kudu file listing and HTTP health checks. All 5 planned tools are now implemented (`facility_record_lookup`, `check_event_schedule`, `get_caller_history`, `record_call_event`, `route_admin_call`). `route_admin_call` turned out not to need `CallFlowEngine`/`TranscriptRoutingService` (those stay `IVR.Functions`-only, untouched) — it's new, purely deterministic keyword/business-hours logic that only needed interfaces already shared in `IVR.Core`. The new `CallEvents` container needs a Bicep redeploy of `rg-ivr-Mcp` before `record_call_event` will work against live Cosmos DB (it currently falls back to in-memory when no connection string is configured). What remains before Phase 6/7 acceptance testing, per [the deployment plan](mcp-integration-deployment-plan.md):
+As of 2026-08-24, `rg-ivr-Mcp` is deployed and all four apps (Function App, MCP server, Admin Portal, Simulator) are running with real code — verified via Kudu file listing and HTTP health checks. All 5 planned tools are implemented and redeployed live (`facility_record_lookup`, `check_event_schedule`, `get_caller_history`, `record_call_event`, `route_admin_call`), including the `CallEvents` container. The Function App's MCP gateway/client (`IVR.Functions/Services/Mcp/`) is also implemented, with automatic fallback to direct calls and wired into one live call-flow site (`CallEnded` event on call termination) — `Mcp__Enabled` is still `false` by default until the app settings are flipped and redeployed. What remains before Phase 6/7 acceptance testing, per [the deployment plan](mcp-integration-deployment-plan.md):
 
-- Redeploy `rg-ivr-Mcp` infrastructure (new `CallEvents` container) and the MCP server app code.
-- Build the Function App's MCP gateway/client and flip `Mcp__Enabled` to `true` with fallback instrumentation.
+- Flip `Mcp__Enabled` to `true` (via Bicep param or app setting) and redeploy the Function App to actually start routing calls through MCP; expand gateway usage to more call-flow sites (e.g. facility lookup, admin call routing) as confidence grows.
 - Add `EventSchedules` management to the Admin Portal and matching Data Seeder records.
 - Add the MCP server to `docker-compose.yml` for local integration testing.
 - Add unit/protocol-level tests and snapshot-test tool schemas.
 - Run simulator acceptance tests (facility lookup, scheduled/unscheduled test, routing, history, event recording) before any Teams integration (Phase 8).
+
 
 

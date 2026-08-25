@@ -6,7 +6,7 @@
     "_generator": {
       "name": "bicep",
       "version": "0.46.1.21595",
-      "templateHash": "14460779521684106477"
+      "templateHash": "15126211284777488755"
     }
   },
   "parameters": {
@@ -128,7 +128,7 @@
             "_generator": {
               "name": "bicep",
               "version": "0.46.1.21595",
-              "templateHash": "4605851083796141533"
+              "templateHash": "378286521123184646"
             }
           },
           "parameters": {
@@ -539,6 +539,45 @@
                       },
                       {
                         "path": "/startTimeUtc/?"
+                      }
+                    ],
+                    "excludedPaths": [
+                      {
+                        "path": "/*"
+                      }
+                    ]
+                  }
+                }
+              },
+              "dependsOn": [
+                "database"
+              ]
+            },
+            "callEventsContainer": {
+              "type": "Microsoft.DocumentDB/databaseAccounts/sqlDatabases/containers",
+              "apiVersion": "2024-02-15-preview",
+              "name": "[format('{0}/{1}/{2}', parameters('name'), 'IvrDatabase', 'CallEvents')]",
+              "properties": {
+                "resource": {
+                  "id": "CallEvents",
+                  "partitionKey": {
+                    "paths": [
+                      "/callId"
+                    ],
+                    "kind": "Hash"
+                  },
+                  "defaultTtl": 7776000,
+                  "indexingPolicy": {
+                    "indexingMode": "consistent",
+                    "includedPaths": [
+                      {
+                        "path": "/callId/?"
+                      },
+                      {
+                        "path": "/eventType/?"
+                      },
+                      {
+                        "path": "/timestampUtc/?"
                       }
                     ],
                     "excludedPaths": [
