@@ -1,4 +1,4 @@
-# Customer Integration Overview - E911 IVR System
+# Customer Integration Overview - e611-IVR System
 
 **Document Version:** 1.0  
 **Date:** May 28, 2026  
@@ -8,7 +8,7 @@
 
 ## Executive Summary
 
-This document provides a comprehensive overview of integrating the E911 IVR (Interactive Voice Response) system with a government customer's on-premises telephony infrastructure. The solution leverages Azure Government cloud services, Azure Communication Services Direct Routing, and Azure OpenAI for intelligent emergency call handling.
+This document provides a comprehensive overview of integrating the e611-IVR (Interactive Voice Response) system with a government customer's on-premises telephony infrastructure. The solution leverages Azure Government cloud services, Azure Communication Services Direct Routing, and Azure OpenAI for intelligent emergency call handling.
 
 ---
 
@@ -93,7 +93,7 @@ graph TB
 **Model:** `gpt-4.1` (deployed in Azure Government)  
 **Purpose:** Emergency call analysis and response orchestration
 
-### Use Cases in E911 IVR
+### Use Cases in e611-IVR
 
 #### 1. **Natural Language Understanding (NLU)**
 
@@ -540,7 +540,7 @@ Monthly Cost (10,000 calls):
    - [ ] Version: _____ (must be compatible)
    - [ ] Number of sites: _____
    - [ ] Total users: _____
-   - [ ] Current E911 solution: _____
+   - [ ] Current e611 solution: _____
    - [ ] SIP trunking experience: Yes/No
 
 2. **Session Border Controller (SBC)**

@@ -1,5 +1,5 @@
 # Azure Communication Services Phone Number Strategy
-## E911 IVR Development Plan
+## e611-IVR Development Plan
 
 **Last Updated:** May 27, 2026  
 **Environment:** Azure US Government  
@@ -143,7 +143,7 @@ For production Direct Routing, you need an SBC. Options:
 
 1. **Run Configuration Script**
    ```powershell
-   cd C:\DSOP\repos3\IVR\e911-ivr\scripts
+   cd C:\DSOP\repos3\IVR\e611-ivr\scripts
    
    # Using parameter file
    .\Run-AcsConfiguration.ps1
@@ -200,7 +200,7 @@ Your project includes a PSTN Simulator for testing:
 **How to Use:**
 ```powershell
 # Navigate to simulator folder
-cd C:\DSOP\repos3\IVR\e911-ivr\simulator
+cd C:\DSOP\repos3\IVR\e611-ivr\simulator
 
 # Start simulator
 docker-compose up
@@ -222,7 +222,7 @@ If you have access to a personal Azure subscription:
 As a Microsoft FTE:
 
 1. File support request for phone number access
-2. Explain: Testing E911 IVR in Azure Government
+2. Explain: Testing e611-IVR in Azure Government
 3. Reference: Azure Communication Services phone number restrictions
 4. Request: Enable phone number purchase capability
 
@@ -254,7 +254,7 @@ As a Microsoft FTE:
 
 1. **Run the availability check script:**
    ```powershell
-   cd C:\DSOP\repos3\IVR\e911-ivr\scripts
+   cd C:\DSOP\repos3\IVR\e611-ivr\scripts
    .\Check-AcsPhoneNumberAvailability.ps1 `
        -ResourceGroup "rg-ivr-dev" `
        -AcsResourceName "ivr-dev-acs-bld64pwxb4ukq"

@@ -1,5 +1,5 @@
 # Azure Communication Services Configuration Guide
-## E911 IVR with Avaya Call Manager Integration
+## e611-IVR with Avaya Call Manager Integration
 
 ---
 
@@ -779,13 +779,13 @@ Create a `PhoneNumberConfig` document in Cosmos DB:
 
 ```json
 {
-  "id": "pn-e911-main-001",
+  "id": "pn-e611-main-001",
   "phoneNumber": "+15551234567",
-  "label": "E911 Main Emergency Line",
+  "label": "e611 Main Emergency Line",
   "numberType": "DirectRouting",
-  "rootMenuId": "menu-e911-root",
+  "rootMenuId": "menu-e611-root",
   "businessHoursConfigId": "bh-24x7",
-  "welcomePromptId": "prompt-e911-welcome",
+  "welcomePromptId": "prompt-e611-welcome",
   "sbcFqdn": "sbc.contoso.com",
   "sbcPort": 5067,
   "calledNumberAliases": [],
@@ -1088,10 +1088,10 @@ To route different numbers to different IVR menu trees:
 Example:
 
 ```json
-// Emergency line → E911 menu
+// Emergency line → e611 menu
 {
   "phoneNumber": "+15551234567",
-  "rootMenuId": "menu-e911-root"
+  "rootMenuId": "menu-e611-root"
 }
 
 // Support line → General support menu

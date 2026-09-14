@@ -30,7 +30,7 @@ Error: "The requested operation is not supported in this environment"
 ```powershell
 # 1. Purchase domain (e.g., witomasitest.us)
 # 2. Update config
-cd C:\DSOP\repos3\IVR\e911-ivr\scripts
+cd C:\DSOP\repos3\IVR\e611-ivr\scripts
 code acs-config-params.ps1  # Update CustomDomain
 
 # 3. Run setup
@@ -56,7 +56,7 @@ code acs-config-params.ps1  # Update CustomDomain
 
 **Steps:**
 ```powershell
-cd C:\DSOP\repos3\IVR\e911-ivr\simulator
+cd C:\DSOP\repos3\IVR\e611-ivr\simulator
 docker-compose up
 ```
 
@@ -102,11 +102,11 @@ Open browser: http://localhost:5000
 
 ```powershell
 # Start simulator
-cd C:\DSOP\repos3\IVR\e911-ivr\simulator
+cd C:\DSOP\repos3\IVR\e611-ivr\simulator
 docker-compose up
 
 # In another terminal, ensure your Function App is running
-cd C:\DSOP\repos3\IVR\e911-ivr
+cd C:\DSOP\repos3\IVR\e611-ivr
 func start --csharp
 ```
 
@@ -169,7 +169,7 @@ If you choose Direct Routing, here's how to get a domain:
 ## 🔧 Scripts Available
 
 ```powershell
-cd C:\DSOP\repos3\IVR\e911-ivr\scripts
+cd C:\DSOP\repos3\IVR\e611-ivr\scripts
 
 # Check phone number availability
 .\Check-AcsPhoneNumberAvailability.ps1 `

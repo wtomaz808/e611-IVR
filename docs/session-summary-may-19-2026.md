@@ -246,7 +246,7 @@ Updated Files:
 ### Recommended Pre-Meeting Prep
 
 1. **Review** the Azure Government limitation document
-2. **Prepare** your use case summary (E911 IVR with Avaya integration)
+2. **Prepare** your use case summary (e611-IVR with Avaya integration)
 3. **Identify** your timeline constraints
 4. **Determine** acceptable alternatives (if any)
 5. **Bring** the questions list above

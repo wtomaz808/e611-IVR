@@ -25,7 +25,7 @@ Pick a subdomain of your organization's domain:
 
 **Script Method:**
 ```powershell
-cd c:\DSOP\repos3\IVR\e911-ivr\scripts
+cd c:\DSOP\repos3\IVR\e611-ivr\scripts
 
 .\Configure-AcsCustomDomain.ps1 `
     -ResourceGroup "your-resource-group" `
@@ -146,7 +146,7 @@ az communication show --name "your-acs-name" --resource-group "your-rg"
 
 ```powershell
 # Navigate to scripts folder
-cd c:\DSOP\repos3\IVR\e911-ivr\scripts
+cd c:\DSOP\repos3\IVR\e611-ivr\scripts
 
 # Run configuration script
 .\Configure-AcsCustomDomain.ps1 `

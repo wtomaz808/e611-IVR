@@ -114,7 +114,7 @@ Check with your Microsoft account team about the roadmap for Direct Routing in A
 ```
 Subject: Direct Routing Custom Domain Support in Azure Government
 
-We are developing an E911 IVR system on Azure Government Cloud using Azure Communication Services.
+We are developing an e611-IVR system on Azure Government Cloud using Azure Communication Services.
 We need to configure Direct Routing to integrate with our existing Avaya Communication Manager,
 but the custom domain configuration APIs return "ResourceTypeRegistrationNotFound" errors.
 

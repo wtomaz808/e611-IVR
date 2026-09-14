@@ -1,4 +1,4 @@
-# E911 IVR Customer Deployment Plan
+# e611-IVR Customer Deployment Plan
 ## Government Organization On-Premises Integration
 
 **Customer Type:** Government Organization (On-Premises)  
@@ -9,7 +9,7 @@
 
 ## Executive Summary
 
-This document outlines the technical requirements, integration points, and deployment plan for integrating the E911 IVR solution with a government organization's on-premises telephony infrastructure.
+This document outlines the technical requirements, integration points, and deployment plan for integrating the e611-IVR solution with a government organization's on-premises telephony infrastructure.
 
 **Key Requirements:**
 - Azure Government tenant, subscription, and landing zone
@@ -94,7 +94,7 @@ This document outlines the technical requirements, integration points, and deplo
 **Critical Integration Questions:**
 ```
 □ Call Routing Requirements
-  - E911 call volume: _____________________ (calls/day)
+  - e611 call volume: _____________________ (calls/day)
   - Geographic locations: _____________________
   - ANI/ALI database: _____________________ (Existing system/provider)
   - Location identification method: _____________________ (Switch, Network, Manual)
@@ -393,7 +393,7 @@ For large organizations with multiple sites:
 **Infrastructure as Code (Bicep/Terraform):**
 ```powershell
 # Deploy all Azure resources
-cd C:\DSOP\repos3\IVR\e911-ivr\infra
+cd C:\DSOP\repos3\IVR\e611-ivr\infra
 
 # Update parameters for customer environment
 # Edit parameters/production.bicepparam with:
@@ -633,7 +633,7 @@ Total: 12-18 months
 - [ ] Call answer within 2 seconds
 - [ ] < 150ms latency for call setup
 - [ ] 100% accurate location identification
-- [ ] All E911 calls routed correctly
+- [ ] All e611 calls routed correctly
 
 **Operational:**
 - [ ] Customer telephony team trained

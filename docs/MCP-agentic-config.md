@@ -1,4 +1,4 @@
-# MCP & Agentic Architecture Configuration - E911 IVR System
+# MCP & Agentic Architecture Configuration - e611-IVR System
 
 **Document Version:** 1.0  
 **Date:** May 28, 2026  
@@ -9,7 +9,7 @@
 
 ## Executive Summary
 
-This document outlines a strategic approach to modernize the E911 IVR system by incorporating **Model Context Protocol (MCP)** and **AI Agents** while maintaining the critical reliability requirements for emergency services.
+This document outlines a strategic approach to modernize the e611-IVR system by incorporating **Model Context Protocol (MCP)** and **AI Agents** while maintaining the critical reliability requirements for emergency services.
 
 ### Key Recommendations
 
@@ -41,7 +41,7 @@ This document outlines a strategic approach to modernize the E911 IVR system by 
 
 ```
 ┌──────────────────────────────────────────────────────────────┐
-│ Current E911 IVR Architecture (Function-Based)               │
+│ Current e611-IVR Architecture (Function-Based)               │
 └──────────────────────────────────────────────────────────────┘
 
 Call → ACS → Azure Function → GPT-4.1 API → Response
@@ -202,11 +202,11 @@ public async Task<IActionResult> HandleCall(CallData call)
 ### MCP Server Implementation
 
 ```typescript
-// mcp-server/e911-tools.ts
+// mcp-server/e611-tools.ts
 import { McpServer } from "@modelcontextprotocol/sdk";
 
 const server = new McpServer({
-  name: "e911-ivr-tools",
+  name: "e611-ivr-tools",
   version: "1.0.0",
   description: "Emergency 911 IVR system tools for call processing"
 });
@@ -421,7 +421,7 @@ graph TB
     style Memory fill:#FFA500,color:#000
 ```
 
-### Agent Types for E911 System
+### Agent Types for e611 System
 
 #### 1. Emergency Response Agent (Primary)
 ```
@@ -631,7 +631,7 @@ public class CallRouter
 
 ### Phase 1: MCP Foundation (Weeks 1-4)
 
-**Goal:** Implement MCP server with core E911 tools
+**Goal:** Implement MCP server with core e611 tools
 
 **Tasks:**
 1. ✅ Set up MCP server infrastructure
@@ -654,7 +654,7 @@ public class CallRouter
 ```typescript
 // Deploy to Azure Container Apps
 const mcpServer = new McpServer({
-  name: "e911-ivr-tools",
+  name: "e611-ivr-tools",
   version: "1.0.0"
 });
 
@@ -897,7 +897,7 @@ public class TrainingSimulationAgent : Agent
 
 ## MCP Tool Definitions
 
-### Complete E911 MCP Tool Library
+### Complete e611 MCP Tool Library
 
 #### Tool 1: emergency_location_lookup
 

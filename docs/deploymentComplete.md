@@ -1,4 +1,4 @@
-# E911 IVR System - Deployment Complete
+# e611-IVR System - Deployment Complete
 
 **Deployment Date:** March 2, 2026  
 **Environment:** Azure Government (AzureUSGovernment)  
@@ -9,7 +9,7 @@
 
 ## Deployment Summary
 
-The E911 IVR system has been successfully deployed to Azure Government cloud with all core components operational. The system includes Azure Communication Services for PSTN telephony, Azure Cognitive Services for speech processing, Azure OpenAI for AI-powered routing, and a Blazor-based admin portal for configuration management.
+The e611-IVR system has been successfully deployed to Azure Government cloud with all core components operational. The system includes Azure Communication Services for PSTN telephony, Azure Cognitive Services for speech processing, Azure OpenAI for AI-powered routing, and a Blazor-based admin portal for configuration management.
 
 ### Deployed Resources (12 Total)
 
@@ -177,7 +177,7 @@ The E911 IVR system has been successfully deployed to Azure Government cloud wit
 
 ## Getting Started - 7-Step Workflow
 
-Now that the system is deployed, follow these steps to configure and use your E911 IVR:
+Now that the system is deployed, follow these steps to configure and use your e611-IVR:
 
 ### 1️⃣ Create Prompts
 Navigate to **Prompts** section in the admin portal and create:

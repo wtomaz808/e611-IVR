@@ -1,4 +1,4 @@
-# E911 IVR Development - Session Notes
+# e611-IVR Development - Session Notes
 
 **Last Updated:** April 10, 2026  
 **Session Focus:** Local environment verification and deployment automation improvements
@@ -24,7 +24,7 @@
    - **Motivation:** Address recurring Azure CLI terminal lockup issue documented in troubleshooting notes
 
 3. **Data Seeder Enhancements**
-   - Created `MenuSeeder.cs` - Generates hierarchical E911 call flow test data
+   - Created `MenuSeeder.cs` - Generates hierarchical e611 call flow test data
      - Main menu with 5 emergency routing options (RDC, Alarm Admin, Fire, Police, Support)
      - Submenu structures for multi-level navigation
      - DTMF + speech keyword support
@@ -91,7 +91,7 @@
 
 2. **Data Seeder Application**
    - Created `IVR.DataSeeder` console application project
-   - Implemented `PromptSeeder.cs` with 31 comprehensive E911 test prompts
+   - Implemented `PromptSeeder.cs` with 31 comprehensive e611 test prompts
    - Implemented `AniAliSeeder.cs` with 12 ANI and 12 ALI test records
    - Added project to solution
    - Uses GUID format for all record IDs
@@ -176,7 +176,7 @@
 ## Project Structure
 
 ```
-e911-ivr/
+e611-ivr/
 ├── deploy-apps.ps1               ✅ NEW - PowerShell deployment script (replaces Azure CLI)
 ├── docs/
 │   ├── deploymentComplete.md     Comprehensive deployment guide
@@ -202,7 +202,7 @@ e911-ivr/
 │       ├── Program.cs
 │       ├── PromptSeeder.cs       (31 prompts - blocked by Cosmos issue)
 │       ├── AniAliSeeder.cs       (24 ANI/ALI records - blocked)
-│       ├── MenuSeeder.cs         ✅ NEW - E911 call flows (ready)
+│       ├── MenuSeeder.cs         ✅ NEW - e611 call flows (ready)
 │       ├── TeamRoutingSeeder.cs  ✅ NEW - AI routing configs (ready)
 │       ├── SimpleCopySeeder.ps1  ✅ NEW - Quick copy utility
 │       └── README.md
@@ -419,7 +419,7 @@ From `src/IVR.DataSeeder/`:
 4. **Documentation:** Create user guide for non-technical administrators
 5. **Performance:** Consider caching frequently accessed prompts and ANI/ALI data
 6. **Scalability:** Review Cosmos DB serverless limits for production load
-7. **Compliance:** Ensure E911 location accuracy meets regulatory requirements
+7. **Compliance:** Ensure e611 location accuracy meets regulatory requirements
 
 ---
 

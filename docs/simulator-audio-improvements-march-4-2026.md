@@ -170,7 +170,7 @@ If speech synthesis is unavailable, the simulator will silently fail and continu
 
 1. Enable audio checkbox ✓
 2. Place call ✓
-3. **Hear:** "Welcome to the E911 IVR system..."
+3. **Hear:** "Welcome to the e611-IVR system..."
 4. **See:** Prompt text in Active Call section
 5. **Respond:** Either click "1" button OR type "fire alarm" and press Enter
 6. **Hear:** Next prompt based on selection

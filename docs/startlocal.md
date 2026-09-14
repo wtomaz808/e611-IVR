@@ -1,6 +1,6 @@
-# Starting the E911 IVR System Locally
+# Starting the e611-IVR System Locally
 
-This guide provides step-by-step instructions to launch all containers needed to run the E911 IVR solution locally.
+This guide provides step-by-step instructions to launch all containers needed to run the e611-IVR solution locally.
 
 ## Prerequisites
 
@@ -63,7 +63,7 @@ From the repository root directory:
 
 ```powershell
 # Navigate to the project root
-cd c:\DSOP\repos3\IVR\e911-ivr
+cd c:\DSOP\repos3\IVR\e611-ivr
 
 # Build and start all containers
 docker compose up --build -d
