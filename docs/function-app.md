@@ -2,7 +2,7 @@
 
 ## Overview
 
-The **IVR Function App** is the automated call handling engine that powers the E911 IVR system. It operates entirely in the background with **zero human interaction** - all operations are triggered automatically by Azure services in response to incoming phone calls.
+The **IVR Function App** is the automated call handling engine that powers the e611-IVR system. It operates entirely in the background with **zero human interaction** - all operations are triggered automatically by Azure services in response to incoming phone calls.
 
 **Key Characteristics:**
 - **Technology**: Azure Functions v4 (.NET 8, isolated worker model)

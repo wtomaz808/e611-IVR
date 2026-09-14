@@ -1,4 +1,4 @@
-# E911 IVR Demo Guide
+# e611-IVR Demo Guide
 
 **Audience:** Customer stakeholders, sales engineers, program managers  
 **Purpose:** Step-by-step walkthrough for demonstrating the Admin Portal and PSTN Simulator  
@@ -8,7 +8,7 @@
 
 ## Overview
 
-The E911 IVR system has two interfaces you will show:
+The e611-IVR system has two interfaces you will show:
 
 | Interface | URL | Role in Demo |
 |---|---|---|
@@ -92,7 +92,7 @@ This is how the IVR menu tree is configured. No code changes, no redeploy.
 #### What to Click
 
 1. Find `prompt-welcome` in the list — this is the first thing callers hear.
-2. Click **Edit** and show the TTS text field: `"Thank you for calling E911 Emergency Services. Press 1 for Emergency Dispatch..."`
+2. Click **Edit** and show the TTS text field: `"Thank you for calling e611-IVR Emergency Services. Press 1 for Emergency Dispatch..."`
 3. Point out the **Voice** and **Style** selectors (neural voices from Azure Cognitive Services).
 4. Click **Cancel** (no changes needed).
 
@@ -120,7 +120,7 @@ ANI = Automatic Number Identification — maps a caller's phone number to their 
 
 ALI = Automatic Location Identification — associates a phone number with a physical address.
 
-| Field | E911 Use Case |
+| Field | e611-IVR Use Case |
 |---|---|
 | Street / City / State | Displayed in call logs for dispatcher situational awareness |
 | Service Area | Used in conditional routing to route to the correct regional PSEC |
@@ -232,12 +232,12 @@ The simulator acts as a fully functional "phone" that drives calls into the IVR 
 
 ### 2.2 Demo Scenario 1 — Basic DTMF Emergency Call
 
-**Goal:** Show a caller dialing the E911 line, navigating DTMF menus, and the call log appearing in real time.
+**Goal:** Show a caller dialing the e611-IVR line, navigating DTMF menus, and the call log appearing in real time.
 
 **Steps:**
 
 1. In the **Simulator**, select caller: `JBPHH — HQ Pacific Fleet` (a military facility from the ANI database)
-2. Select DID: `+17035550911` (E911 Main Line)
+2. Select DID: `+17035550911` (e611-IVR Main Line)
 3. Click **Place Call**
 4. Watch the **Event Trace** populate:
    - `commsNotification (incoming)` — Simulator → IVR

@@ -1,10 +1,10 @@
 # IVR Data Seeder
 
-Console application to seed comprehensive test data into the E911 IVR system Cosmos DB.
+Console application to seed comprehensive test data into the e611-IVR system Cosmos DB.
 
 ## Features
 
-- Seeds **31 test prompts** covering all E911 scenarios
+- Seeds **31 test prompts** covering all e611-IVR scenarios
 - Seeds **12 ANI records** (Automatic Number Identification - caller data)
 - Seeds **12 ALI records** (Automatic Location Identification - location data)
 - Supports both local development and Azure environments
@@ -177,7 +177,7 @@ The seeder provides detailed console output:
 
 ```
 ╔══════════════════════════════════════════════════════════╗
-║   E911 IVR System - Prompt Data Seeder                  ║
+║   e611-IVR System - Prompt Data Seeder                  ║
 ╚══════════════════════════════════════════════════════════╝
 
 📦 Connecting to Cosmos DB...

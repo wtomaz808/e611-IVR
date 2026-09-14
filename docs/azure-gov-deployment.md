@@ -1,7 +1,7 @@
 # Azure Government Deployment Guide
 
 ## Overview
-This guide covers deploying the E911 IVR system to **Azure Government** cloud environment.
+This guide covers deploying the e611-IVR system to **Azure Government** cloud environment.
 
 ## Azure Government Considerations
 
