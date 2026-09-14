@@ -1,4 +1,4 @@
-# E911 IVR — Local Demo Guide (Teams Bot Mode)
+# e611-IVR — Local Demo Guide (Teams Bot Mode)
 
 This guide covers how to run a full end-to-end demo of the Teams-integrated IVR
 **without needing access to a real Microsoft Teams tenant**. The PSTN Simulator
@@ -43,7 +43,7 @@ Your Browser
 Copy the example and fill in the optional Azure service strings:
 
 ```powershell
-cd c:\DSOP\repos3\IVR\e911-ivr
+cd c:\DSOP\repos3\IVR\e611-ivr
 Copy-Item .env.example .env   # if not already done
 ```
 
@@ -101,12 +101,12 @@ docker compose ps
 
 ### Scene 1: Basic DTMF Call Flow
 
-**Goal:** Show a caller dialing in, navigating the E911 menu with keypad presses,
+**Goal:** Show a caller dialing in, navigating the e611-IVR menu with keypad presses,
 and the call log being recorded.
 
 1. In the **Simulator** (Tab 1), click **New Call**
 2. Select a caller from the pre-loaded ANI records (e.g., "John Smith - VIP")
-3. Select DID `+17035550911` (E911 Main Line)
+3. Select DID `+17035550911` (e611-IVR Main Line)
 4. Click **Place Call**
    - Simulator sends `commsNotification (incoming)` to the IVR
    - IVR answers via mock Graph API
@@ -147,7 +147,7 @@ and the call log being recorded.
 **Goal:** Show the admin portal's menu builder.
 
 1. In the **Admin Portal**, click **Call Flows**
-2. Show the E911 Main Menu tree with all 4 options
+2. Show the e611-IVR Main Menu tree with all 4 options
 3. Demonstrate editing a menu option label or DTMF key
 4. Save — the change takes effect on the next call immediately (no redeploy)
 

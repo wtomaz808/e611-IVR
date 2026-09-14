@@ -1,6 +1,6 @@
 # IVR System — Teams-Integrated
 
-A multi-level IVR (Interactive Voice Response) system for E911 call handling, built on Azure. Inbound PSTN calls are received by **Microsoft Teams Phone System** and routed to an **Azure Functions calling bot** that drives ANI/ALI lookup, configurable menu navigation, AI-powered intent routing, and external system integration — all managed through a Blazor Server admin portal.
+A multi-level IVR (Interactive Voice Response) system for e611-IVR call handling, built on Azure. Inbound PSTN calls are received by **Microsoft Teams Phone System** and routed to an **Azure Functions calling bot** that drives ANI/ALI lookup, configurable menu navigation, AI-powered intent routing, and external system integration — all managed through a Blazor Server admin portal.
 
 > **Architecture change (July 2026):** Azure Communication Services (ACS) has been replaced with a Microsoft Teams Calling Bot + Microsoft Graph API. The IVR business logic, Cosmos DB schema, OpenAI integration, and Admin Portal are unchanged.
 
@@ -71,7 +71,7 @@ Azure Functions — TeamsCallBot  (HTTP trigger /api/bot-messages)
 ## Project Structure
 
 ```
-e911-ivr/
+e611-ivr/
 ├── src/
 │   ├── IVR.Core/                    # Shared library — zero Azure calling dependencies
 │   │   ├── Models/                  # ANI, ALI, CallLog, Menu, Prompt, TeamRouting models

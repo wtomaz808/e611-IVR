@@ -1,7 +1,7 @@
 # Teams Integration Field Guide
 
 **Audience:** Field engineers, deployment teams  
-**Purpose:** Step-by-step guide for connecting a customer's Microsoft Teams phone number to the E911 IVR system  
+**Purpose:** Step-by-step guide for connecting a customer's Microsoft Teams phone number to the e611-IVR system
 **Assumption:** The IVR Function App and Bot Service are already deployed and running in your Azure Government tenant.
 
 ---
@@ -103,8 +103,8 @@ Connect-MicrosoftTeams
 
 # Create a Resource Account linked to your bot's App ID
 New-CsOnlineApplicationInstance `
-  -UserPrincipalName "ivr-e911@<customer-domain>.gov" `
-  -DisplayName "E911 IVR" `
+  -UserPrincipalName "ivr-e611@<customer-domain>.gov" `
+  -DisplayName "e611-IVR" `
   -ApplicationId "<MicrosoftAppId>"   # ← your bot's Client ID
 
 # Capture the ObjectId from the output — needed in the next step
@@ -129,19 +129,19 @@ Sync-CsOnlineApplicationInstance -ObjectId "<ObjectId-from-above>"
 ```powershell
 # For a Direct Routing number (customer-owned number via SBC):
 Set-CsPhoneNumberAssignment `
-  -Identity "ivr-e911@<customer-domain>.gov" `
+  -Identity "ivr-e611@<customer-domain>.gov" `
   -PhoneNumber "+1<10-digit-number>" `
   -PhoneNumberType DirectRouting
 
 # For a Microsoft Calling Plan number (Microsoft-provided):
 Set-CsPhoneNumberAssignment `
-  -Identity "ivr-e911@<customer-domain>.gov" `
+  -Identity "ivr-e611@<customer-domain>.gov" `
   -PhoneNumber "+1<10-digit-number>" `
   -PhoneNumberType CallingPlan
 
 # For an Operator Connect number:
 Set-CsPhoneNumberAssignment `
-  -Identity "ivr-e911@<customer-domain>.gov" `
+  -Identity "ivr-e611@<customer-domain>.gov" `
   -PhoneNumber "+1<10-digit-number>" `
   -PhoneNumberType OperatorConnect
 ```
@@ -198,7 +198,7 @@ Using the DataSeeder or directly in Cosmos DB, add a `PhoneNumberConfig` documen
   "id": "pn-customer-001",
   "partitionKey": "phone-number",
   "phoneNumber": "+1<10-digit-number>",
-  "label": "Customer E911 Main Line",
+  "label": "Customer e611-IVR Main Line",
   "numberType": "TeamsDirectRouting",
   "rootMenuId": "menu-main",
   "isActive": true

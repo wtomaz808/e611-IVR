@@ -1,6 +1,6 @@
 # IVR Scripts
 
-This folder contains PowerShell automation scripts for the E911 IVR system.
+This folder contains PowerShell automation scripts for the e611-IVR system.
 
 ## Available Scripts
 

@@ -1,22 +1,22 @@
 # Terminology & Glossary
 
-Reference definitions for telephony, Microsoft Teams, and Azure terms used throughout the E911 IVR system.
+Reference definitions for telephony, Microsoft Teams, and Azure terms used throughout the e611-IVR system.
 
 ---
 
 ## Telephony Terms
 
 ### ANI — Automatic Number Identification
-The caller's phone number as delivered by the carrier network. In E911 systems, ANI is the primary key used to identify who is calling, look up their record in the ANI database, and drive routing decisions (VIP bypass, blocking, custom menus). Equivalent to caller ID but at the carrier/network level rather than the handset.
+The caller's phone number as delivered by the carrier network. In e611-IVR systems, ANI is the primary key used to identify who is calling, look up their record in the ANI database, and drive routing decisions (VIP bypass, blocking, custom menus). Equivalent to caller ID but at the carrier/network level rather than the handset.
 
 ### ALI — Automatic Location Identification
-The physical address or location associated with a phone number, maintained in a separate database linked to ANI. In E911 contexts, ALI provides the dispatcher (or the IVR) with the caller's location without the caller needing to state it — critical for emergency response. ALI records include street address, building, floor, GPS coordinates, service area, and region.
+The physical address or location associated with a phone number, maintained in a separate database linked to ANI. In e611-IVR contexts, ALI provides the dispatcher (or the IVR) with the caller's location without the caller needing to state it — critical for emergency response. ALI records include street address, building, floor, GPS coordinates, service area, and region.
 
 ### PSTN — Public Switched Telephone Network
 The global circuit-switched telephone network that carries traditional voice calls. Includes landline infrastructure, cellular carrier networks, and the interconnections between them. In this system, PSTN calls arrive via Direct Routing through a Session Border Controller into Microsoft Teams Phone System.
 
 ### DID — Direct Inward Dialing
-A telephone number assigned to a specific endpoint or service. In IVR systems, each DID can be configured to route callers into a different menu tree, enabling a single IVR deployment to serve multiple lines (e.g., a main E911 line, an after-hours line, a test line). Also called a "phone number," "DDI" (in the UK), or simply "the number."
+A telephone number assigned to a specific endpoint or service. In IVR systems, each DID can be configured to route callers into a different menu tree, enabling a single IVR deployment to serve multiple lines (e.g., a main e611-IVR line, an after-hours line, a test line). Also called a "phone number," "DDI" (in the UK), or simply "the number."
 
 ### Direct Routing
 A Microsoft Teams Phone System feature that connects an organization's existing PSTN carrier to Teams via a customer-managed Session Border Controller (SBC). Instead of purchasing phone numbers from Microsoft, the organization keeps its existing numbers and carrier relationship while routing calls through Teams. This is the primary telephony architecture for this IVR system.
