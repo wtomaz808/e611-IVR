@@ -18,13 +18,13 @@
       "value": "9fe34ecc-678c-4b44-ae0b-cbd6fca8b1d6"
     },
     "teamsBotAppId": {
-      "value": ""
+      "value": "925bc77e-12db-4bcc-a7c0-5249c7cca2b7"
     },
     "teamsBotAppPassword": {
       "value": ""
     },
     "deployBotService": {
-      "value": false
+      "value": true
     },
     "simulatorGraphEndpoint": {
       "value": ""

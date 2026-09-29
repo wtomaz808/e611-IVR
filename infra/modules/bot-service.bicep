@@ -22,8 +22,7 @@ param tags object
 @description('Entra App Registration Application (client) ID for the bot')
 param microsoftAppId string
 
-@description('Entra tenant ID (retained for azurebot kind upgrade path)')
-#disable-next-line no-unused-params
+@description('Entra tenant ID the bot App Registration belongs to (required for SingleTenant msaAppType)')
 param microsoftAppTenantId string
 
 @description('Full HTTPS URL of the Function App bot messaging endpoint. Format: https://<functionapp>.azurewebsites.{suffix}/api/bot-messages')
@@ -34,6 +33,12 @@ param displayName string = 'IVR Calling Bot'
 
 @description('Bot description shown in the Teams app catalog')
 param botDescription string = 'E911 IVR Teams Calling Bot — routes and manages emergency calls'
+
+// True when deploying into Azure Government/GCC High — the BotService
+// Teams-channel provider requires deploymentEnvironment to be set
+// explicitly there (see teamsChannel below), or it assumes a commercial
+// deployment and rejects channel/calling provisioning.
+var isGovCloud = environment().name == 'AzureUSGovernment'
 
 // ─── Bot Channels Registration ──────────────────────────────────
 // S1 (Standard) is required for Teams calling; F0 (Free) does not
@@ -53,8 +58,12 @@ resource botService 'Microsoft.BotService/botServices@2022-09-15' = {
     description: botDescription
     endpoint: messagingEndpoint
     msaAppId: microsoftAppId
-    // Note: msaAppType and msaAppTenantId are properties of 'azurebot' kind only.
-    // For 'sdk' kind, tenancy is controlled by the App Registration itself.
+    // Required even for 'sdk' kind: ARM defaults msaAppType to 'MultiTenant' when
+    // omitted, and multitenant bot creation is now rejected by the BotService
+    // provider ("Multitenant bot creation is deprecated"). Must match the
+    // sign-in audience the App Registration was created with (AzureADMyOrg).
+    msaAppType: 'SingleTenant'
+    msaAppTenantId: microsoftAppTenantId
     isStreamingSupported: false
   }
 }
@@ -69,11 +78,18 @@ resource teamsChannel 'Microsoft.BotService/botServices/channels@2022-09-15' = {
   location: 'global'
   properties: {
     channelName: 'MsTeamsChannel'
-    properties: {
+    properties: union({
+      acceptedTerms: true
       enableCalling: true
       callingWebhook: messagingEndpoint
+      incomingCallRoute: 'graphPma'
+      isTeamsIvrEnabled: false
       isEnabled: true
-    }
+      // Required in Azure Government/GCC High — omitting it makes the
+      // BotService provider assume a commercial deployment, which then
+      // rejects Teams-channel/calling provisioning with
+      // "APS not implemented for CommercialDeployment".
+    }, isGovCloud ? { deploymentEnvironment: 'GCCHighDeployment' } : {})
   }
 }
 

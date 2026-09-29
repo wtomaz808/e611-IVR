@@ -92,14 +92,28 @@ $requiredResourceAccess = @(
 # ─── Create the App Registration ────────────────────────────────
 Write-Host "Creating App Registration '$AppName' ..." -ForegroundColor Cyan
 
+# Write the JSON to a temp file and pass it via the "@file" syntax.
+# Passing the JSON string directly on PowerShell mangles the quoting
+# (az CLI receives literal `{resourceAppId:...}` with the double quotes
+# stripped), so --required-resource-accesses must read from a file here.
+$resourceAccessFile = New-TemporaryFile
+Set-Content -Path $resourceAccessFile -Value $requiredResourceAccess -NoNewline -Encoding utf8
+
 $app = az ad app create `
     --display-name $AppName `
     --sign-in-audience 'AzureADMyOrg' `
-    --required-resource-accesses $requiredResourceAccess `
+    --required-resource-accesses "@$resourceAccessFile" `
     -o json | ConvertFrom-Json
+
+Remove-Item -Path $resourceAccessFile -ErrorAction SilentlyContinue
 
 $appId   = $app.appId
 $appObjId = $app.id
+
+if ([string]::IsNullOrWhiteSpace($appId)) {
+    Write-Error "App Registration creation failed — no appId returned. Aborting."
+    exit 1
+}
 
 Write-Host "  App Registration created" -ForegroundColor Green
 Write-Host "  Application (client) ID : $appId"    -ForegroundColor White
