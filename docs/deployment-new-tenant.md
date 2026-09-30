@@ -83,7 +83,7 @@ This deploys:
 - ✅ Cosmos DB (serverless) with containers
 - ✅ Storage Account for prompts and function storage
 - ✅ Cognitive Services (Speech TTS/STT)
-- ✅ Azure OpenAI (GPT-4.1)
+- ✅ Azure OpenAI (GPT-5.6-terra)
 - ✅ Function App (IVR engine)
 - ✅ App Service (Admin Portal)
 - ✅ App Service (PSTN Simulator)

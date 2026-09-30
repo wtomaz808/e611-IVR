@@ -88,7 +88,7 @@ The MCP environment is a fully isolated stack in `rg-ivr-Mcp` — it does **not*
 | Function App | `modules/function-app.bicep` | Adds `Mcp__Enabled`, `Mcp__Endpoint`, `Mcp__Audience`, `Mcp__FallbackToDirect` settings |
 | Cosmos DB | `modules/cosmos-db.bicep` | Adds the `EventSchedules` container alongside existing containers |
 | Key Vault access | `modules/keyvault-access.bicep` | Role-assignment loop now includes the MCP server's principal ID |
-| Parameters | `parameters/azuregov-mcp.bicepparam` | `environmentName='mcp'`, `location='usgovvirginia'`; Bot Service deploy disabled (Phase 8 deferred) |
+| Parameters | `parameters/azuregov-mcp.bicepparam` | `environmentName='mcp'`, `location='usgovvirginia'`; Bot Service + Teams channel deployed for structural parity with `rg-ivr-teams` (live Teams Phone System wiring still deferred to Phase 8) |
 
 `main.bicep` deploys the MCP server module ahead of the Function App so its hostname and managed-identity principal ID are available to wire into the Function App's settings and the shared Key Vault access module.
 

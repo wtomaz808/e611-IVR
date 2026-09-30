@@ -101,7 +101,7 @@ The process of converting spoken audio into written text (a transcript). The IVR
 An XML-based markup language that gives precise control over TTS output — pausing, emphasis, pronunciation, speaking rate, and prosody. The IVR supports SSML prompts for advanced scenarios such as inserting a caller's name into a greeting or varying emphasis on important words.
 
 ### Azure OpenAI
-Microsoft's managed deployment of OpenAI's large language models (GPT-4o, GPT-4.1, etc.) within Azure infrastructure. The IVR uses Azure OpenAI in two pipelines: (1) **Intent Classification** — classify a caller's spoken words into one of N configured routing destinations; (2) **Data Extraction** — extract structured fields (building, action, system type) from a transcript for submission to external REST APIs.
+Microsoft's managed deployment of OpenAI's large language models (GPT-4o, GPT-5.6, etc.) within Azure infrastructure. This solution's active deployment is **gpt-5.6-terra**. The IVR uses Azure OpenAI in two pipelines: (1) **Intent Classification** — classify a caller's spoken words into one of N configured routing destinations; (2) **Data Extraction** — extract structured fields (building, action, system type) from a transcript for submission to external REST APIs.
 
 ### Azure App Service
 Microsoft's fully managed platform for hosting web applications. The Admin Portal (Blazor Server) and PSTN Simulator (Blazor Server) are both hosted on Azure App Service (Windows or Linux). App Service handles SSL, scaling, deployment slots, and managed identity without requiring VM management.

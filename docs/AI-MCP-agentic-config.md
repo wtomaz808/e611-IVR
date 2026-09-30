@@ -13,7 +13,7 @@ This document describes the AI architecture powering the Admin Call Automation I
 
 The system's core mission is to **relieve 911 operators and dispatch personnel from receiving routine administrative calls** — fire alarm tests, door access events, HVAC alerts, security system notifications, maintenance check-ins, and other non-emergency facility calls that currently consume operator time and create noise in emergency dispatch environments. The AI handles these calls automatically, logs them, notifies the appropriate facility personnel, and escalates to a human operator only when the call represents a genuine exception.
 
-The system uses **Azure OpenAI GPT-4.1**, **Azure AI Speech**, and a custom orchestration layer to deliver an intelligent, context-aware call handling experience that no off-the-shelf product can replicate. It runs entirely within the **Azure Government cloud**, maintaining FedRAMP and IL compliance boundaries.
+The system uses **Azure OpenAI GPT-5.6-terra**, **Azure AI Speech**, and a custom orchestration layer to deliver an intelligent, context-aware call handling experience that no off-the-shelf product can replicate. It runs entirely within the **Azure Government cloud**, maintaining FedRAMP and IL compliance boundaries.
 
 The forward architecture builds on this foundation using **Model Context Protocol (MCP)** to standardize how AI tools are exposed and called, and introduces **AI Agents** for non-critical reasoning tasks — creating a system that continuously improves over time.
 
@@ -52,7 +52,7 @@ Microsoft Teams includes a built-in Auto-Attendant feature. For general office c
 
 | Capability | Teams Auto-Attendant | This AI System |
 |---|---|---|
-| **Natural language understanding** | ❌ None — DTMF tones and simple keyword triggers only | ✅ Full NLU via GPT-4.1 — classifies call intent regardless of how it is phrased |
+| **Natural language understanding** | ❌ None — DTMF tones and simple keyword triggers only | ✅ Full NLU via GPT-5.6-terra — classifies call intent regardless of how it is phrased |
 | **Facility database integration** | ❌ Not supported | ✅ Real-time lookup of caller/device identity, facility, and schedule from provisioned databases |
 | **Scheduled event awareness** | ❌ No awareness of planned tests or maintenance windows | ✅ Cross-references incoming calls against known scheduled events to auto-confirm routine tests |
 | **Dynamic routing logic** | ❌ Fixed decision trees configured in the Teams admin center | ✅ AI-driven routing that adapts to call type, facility, time of day, and caller history |
@@ -88,7 +88,7 @@ The system is live in Azure Government, resource group `rg-ivr-teams`.
 
 | Component | Service | Role |
 |---|---|---|
-| **Language Model** | Azure OpenAI GPT-4.1 | Natural language understanding, intent classification, response generation |
+| **Language Model** | Azure OpenAI GPT-5.6-terra | Natural language understanding, intent classification, response generation |
 | **Speech Synthesis** | Azure AI Speech (TTS) | Generates caller-facing audio prompts on demand |
 | **Speech Recognition** | Azure AI Speech (STT) | Transcribes caller speech input in real-time |
 | **Orchestration** | Azure Functions (.NET 8) | Handles all call events, invokes AI services, enforces business logic |
@@ -110,7 +110,7 @@ graph TB
 
     subgraph "Azure Government - rg-ivr-teams"
         Func[Azure Functions\nTeamsCallBot.cs]
-        OpenAI[Azure OpenAI\nGPT-4.1]
+        OpenAI[Azure OpenAI\nGPT-5.6-terra]
         Speech[Azure AI Speech\nTTS / STT]
         Cosmos[Cosmos DB\nPrompts · Menus · Facility Records]
         Blob[Blob Storage\nAudio Cache]
@@ -144,7 +144,7 @@ sequenceDiagram
     participant Teams as Teams Phone System
     participant Graph as Microsoft Graph
     participant Func as Azure Functions
-    participant AI as GPT-4.1 + Speech
+    participant AI as GPT-5.6-terra + Speech
     participant DB as Cosmos DB
 
     Caller->>Teams: Dials admin line
@@ -175,7 +175,7 @@ sequenceDiagram
 
 ### Intent Classification
 
-When a caller speaks, the speech-to-text engine transcribes the audio. That transcript is then passed to GPT-4.1 for intent classification. The model determines:
+When a caller speaks, the speech-to-text engine transcribes the audio. That transcript is then passed to GPT-5.6-terra for intent classification. The model determines:
 
 - What type of admin event is being reported (alarm test, access event, maintenance check-in, HVAC alert, security notification, etc.)
 - Whether the event matches a scheduled activity or is an unexpected occurrence requiring escalation
@@ -215,7 +215,7 @@ Facility records in Cosmos DB associate a calling number with a location, buildi
 
 ### Natural Language Understanding
 
-Built-in auto-attendants and traditional IVR systems understand keypad input and, at best, a handful of rigid voice commands ("say yes or no"). GPT-4.1 understands natural language at human level. When a technician calls in and says *"This is a scheduled monthly test of the suppression system in Building 6, panel 3"*, a traditional IVR times out with no matching keyword and replays the main menu. This system classifies the call as a scheduled test, cross-references the maintenance calendar, auto-confirms with the technician, notifies the facility manager, and writes a compliance log entry — all without an operator.
+Built-in auto-attendants and traditional IVR systems understand keypad input and, at best, a handful of rigid voice commands ("say yes or no"). GPT-5.6-terra understands natural language at human level. When a technician calls in and says *"This is a scheduled monthly test of the suppression system in Building 6, panel 3"*, a traditional IVR times out with no matching keyword and replays the main menu. This system classifies the call as a scheduled test, cross-references the maintenance calendar, auto-confirms with the technician, notifies the facility manager, and writes a compliance log entry — all without an operator.
 
 ### Adaptive Conversation
 
@@ -240,7 +240,7 @@ None of this requires a code change or a new deployment. All of it is data in Co
 
 ### Varied Caller Types
 
-Admin calls come from a wide range of sources — automated alarm panels sending DTMF tones, technicians calling from noisy mechanical rooms, security staff using handheld radios, and facility management systems generating automated voice notifications. Azure AI Speech STT is tuned for telephony audio quality and handles all of these input types. The combination of STT and GPT-4.1 reasoning means the system extracts intent reliably regardless of input quality or caller type.
+Admin calls come from a wide range of sources — automated alarm panels sending DTMF tones, technicians calling from noisy mechanical rooms, security staff using handheld radios, and facility management systems generating automated voice notifications. Azure AI Speech STT is tuned for telephony audio quality and handles all of these input types. The combination of STT and GPT-5.6-terra reasoning means the system extracts intent reliably regardless of input quality or caller type.
 
 ### Full Audit Trail
 
@@ -283,7 +283,7 @@ graph LR
 
     subgraph "With MCP (Target)"
         FuncB[Azure Function] --> MCPServer[MCP Tool Registry]
-        GPT[GPT-4.1] --> MCPServer
+        GPT[GPT-5.6-terra] --> MCPServer
         MCPServer --> T1[ANI Lookup Tool]
         MCPServer --> T2[Routing Tool]
         MCPServer --> T3[Geocoding Tool]
@@ -302,7 +302,7 @@ The MCP layer provides:
 |---|---|
 | **Standardized contracts** | Every tool has a documented input/output schema. The AI model knows exactly what to send and what to expect. |
 | **Independent testability** | Each MCP tool can be tested in isolation without spinning up the full call stack. |
-| **AI-native discoverability** | GPT-4.1 can read tool descriptions and decide which tools to call — without the orchestration logic being hardcoded. |
+| **AI-native discoverability** | GPT-5.6-terra can read tool descriptions and decide which tools to call — without the orchestration logic being hardcoded. |
 | **Reuse across systems** | The same ANI lookup tool can be used by the Function App, by an AI Agent, by a reporting tool, or by a developer testing manually. |
 | **Version control** | Tools are versioned independently. A breaking change to the routing algorithm does not require updating every consumer simultaneously. |
 | **Reduced coupling** | The Function App does not need to know how ANI lookup works internally — only that it calls the tool and gets a location back. |
@@ -376,7 +376,7 @@ graph TB
     subgraph "Shared Infrastructure"
         MCP[MCP Tool Registry]
         Cosmos2[Cosmos DB]
-        OpenAI2[GPT-4.1]
+        OpenAI2[GPT-5.6-terra]
         style MCP fill:#00BCF2,color:#000
     end
 
@@ -448,7 +448,7 @@ Apply the following questions in order to choose the right component:
 | Facility record lookup | ✅ Primary | ❌ | ✅ |
 | Play audio prompt | ✅ Primary | ❌ | ✅ |
 | Collect DTMF tone | ✅ Primary | ❌ | — |
-| Classify call type / intent | ✅ via GPT-4.1 | ❌ | — |
+| Classify call type / intent | ✅ via GPT-5.6-terra | ❌ | — |
 | Check event schedule | ✅ Primary | ❌ | ✅ |
 | Auto-confirm routine event | ✅ Primary | ❌ | ✅ |
 | Route to admin staff | ✅ Primary | ❌ | ✅ |
@@ -481,7 +481,7 @@ graph TB
     subgraph "CRITICAL PATH"
         direction TB
         Func2[Azure Functions\nCall Orchestration]
-        GPT2[GPT-4.1\nCall Classification]
+        GPT2[GPT-5.6-terra\nCall Classification]
         DB2[Cosmos DB\nPrompts · Menus · Facility Records]
         Blob2[Blob Storage\nAudio Cache]
         Speech2[Azure AI Speech\nTTS / STT]
@@ -531,7 +531,7 @@ The system is designed with multiple fallback layers so that a failure in any ad
 |---|---|---|
 | 1 | AI Agent | Azure Function handles the same task |
 | 2 | MCP server | Azure Function calls Cosmos DB and downstream services directly |
-| 3 | GPT-4.1 | System falls back to DTMF-only menu navigation (caller presses keys) |
+| 3 | GPT-5.6-terra | System falls back to DTMF-only menu navigation (caller presses keys) |
 | 4 | Speech synthesis | Pre-cached audio files in Blob Storage are played |
 | 5 | Cosmos DB | Calls are answered and transferred to the operations desk fallback number |
 
@@ -590,7 +590,7 @@ No single failure causes an admin call to go unanswered.
 | Facility record lookup during live call | ✅ | ✅ | ❌ | Fast, structured — ideal for MCP |
 | Schedule check during live call | ✅ | ✅ | ❌ | Fast, structured — ideal for MCP |
 | Audio prompt playback | ✅ | — | ❌ | Handled by Graph Calling API |
-| Call type classification | ✅ via GPT-4.1 | — | ❌ | Direct model call on live call path |
+| Call type classification | ✅ via GPT-5.6-terra | — | ❌ | Direct model call on live call path |
 | Auto-confirm routine event | ✅ | ✅ | ❌ | Deterministic — Function + MCP |
 | Post-call compliance summary | — | ✅ | ✅ | Non-blocking, reasoning required |
 | Quality analysis | — | ✅ | ✅ | Analytical, time-insensitive |
@@ -601,7 +601,7 @@ No single failure causes an admin call to go unanswered.
 
 ### Summary Recommendation
 
-- **Live admin call, time-critical** → Azure Function + MCP tools + GPT-4.1. Agents must not be in this path.
+- **Live admin call, time-critical** → Azure Function + MCP tools + GPT-5.6-terra. Agents must not be in this path.
 - **Post-call compliance summary or analysis** → AI Agent + MCP tools.
 - **Training, simulation, or QA** → AI Agent + MCP tools.
 - **Prompt, menu, or facility configuration change** → Admin Portal → Cosmos DB. No code change, no deployment required.

@@ -23,7 +23,7 @@ Azure Functions — TeamsCallBot  (HTTP trigger /api/bot-messages)
 │   └─ Audio file  ─► Azure Blob Storage (.wav/.mp3)
 ├─ Collects DTMF   ─► Microsoft Graph API  POST .../recordResponse
 ├─ Speech input    ─► Azure Cognitive Services (STT) ─► transcript string
-├─ AI routing      ─► Azure OpenAI GPT-4.1  (intent classification)
+├─ AI routing      ─► Azure OpenAI GPT-5.6-terra  (intent classification)
 ├─ Call transfer   ─► Microsoft Graph API  POST .../transfer
 └─ Call logs       ─► Cosmos DB
 ```
@@ -55,7 +55,7 @@ Azure Functions — TeamsCallBot  (HTTP trigger /api/bot-messages)
 |                           +-------------------------------------+  |
 |  +------------------+                       ^                     |
 |  | Azure OpenAI     |◄──────────────────────+  AI intent         |
-|  | (GPT-4.1)        |                                             |
+|  | (GPT-5.6-terra)  |                                             |
 |  +------------------+    +-------------------------------------+  |
 |                           | App Service (Blazor Admin Portal)   |  |
 |  +------------------+    | Manages menus, prompts, ANI/ALI,    |  |
@@ -106,15 +106,20 @@ e611-ivr/
 │   ├── main.bicep                   # Main orchestrator
 │   ├── modules/
 │   │   ├── bot-service.bicep        # Azure Bot Service + Teams channel (calling enabled)
+│   │   ├── mcp-server.bicep         # MCP server (Linux App Service; Streamable HTTP)
 │   │   ├── cosmos-db.bicep          # Cosmos DB + containers
 │   │   ├── storage.bicep            # Blob storage for audio prompts
 │   │   ├── cognitive-services.bicep # Speech TTS/STT
-│   │   ├── openai.bicep             # Azure OpenAI (GPT-4.1)
+│   │   ├── openai.bicep             # Azure OpenAI (GPT-5.6-terra)
 │   │   ├── function-app.bicep       # Function App hosting
 │   │   ├── app-service.bicep        # Admin portal hosting
+│   │   ├── keyvault.bicep           # Key Vault (RBAC-authorized secrets)
+│   │   ├── keyvault-access.bicep    # Role assignments for app managed identities
 │   │   └── app-insights.bicep       # Monitoring
 │   └── parameters/
-│       ├── azuregov.bicepparam      # Azure Government (GCC High) parameters
+│       ├── azuregov.bicepparam      # Azure Government (GCC High) parameters — Teams-only env
+│       ├── azuregov-teams.bicepparam # Azure Government — rg-ivr-teams environment
+│       ├── azuregov-mcp.bicepparam  # Azure Government — rg-ivr-Mcp (MCP) environment
 │       └── dev.bicepparam           # Commercial dev parameters
 │
 ├── scripts/
@@ -128,14 +133,15 @@ e611-ivr/
 
 | Service | Purpose | Notes |
 |---|---|---|
-| **Azure Bot Service** (S1) | Registers calling bot, enables Teams channel | Deployed via Bicep |
+| **Azure Bot Service** (S1) | Registers calling bot, enables Teams channel | Deployed via Bicep (kind: sdk, SingleTenant) |
 | **Azure Functions** (v4) | IVR engine — TeamsCallBot + all IVR services | .NET 8 isolated worker |
 | **Microsoft Graph API** | Call control (answer, play, DTMF, transfer, hangup) | App-only auth via Entra |
 | **Teams Phone System** | PSTN reception via Calling Plans or Operator Connect | M365 admin config |
+| **MCP Server** | Remote MCP tool host (facility/schedule/routing/history tools) | Linux App Service; Streamable HTTP; Entra-protected |
 | **Cosmos DB** (Serverless) | All IVR configuration and call logs | |
 | **Azure Blob Storage** | Pre-recorded audio prompt files (.wav/.mp3) | |
 | **Azure Cognitive Services** | TTS (Neural Voice) + STT (speech recognition) | |
-| **Azure OpenAI** (GPT-4.1) | AI intent classification for speech-routed calls | |
+| **Azure OpenAI** (GPT-5.6-terra) | AI intent classification for speech-routed calls | DataZoneStandard SKU in Azure Gov |
 | **App Service** | Blazor admin portal | |
 | **Entra ID** | Admin portal auth + Bot App Registration | Run Create-BotAppRegistration.ps1 |
 | **Application Insights** | Telemetry + logging | |
@@ -202,7 +208,7 @@ Create `src/IVR.Functions/local.settings.json`:
     "CognitiveServicesEndpoint": "<speech-endpoint>",
     "AzureOpenAI__Endpoint": "<openai-endpoint>",
     "AzureOpenAI__ApiKey": "<openai-key>",
-    "AzureOpenAI__DeploymentName": "gpt-41"
+    "AzureOpenAI__DeploymentName": "gpt-56-terra"
   }
 }
 ```

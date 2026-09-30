@@ -37,7 +37,7 @@ flowchart LR
     MCP --> Insights
 ```
 
-The Function App invokes MCP tools explicitly for live-call operations. GPT-4.1 continues to perform transcript classification and structured extraction, but it does not autonomously select or execute tools in this release.
+The Function App invokes MCP tools explicitly for live-call operations. gpt-5.6-terra continues to perform transcript classification and structured extraction, but it does not autonomously select or execute tools in this release. (Originally gpt-4.1; upgraded after gpt-4.1 was marked Legacy in the model catalog — see [Azure Services / MCP Integration diagram](./azure-services-mcp-integration.drawio) for the current SKU.)
 
 ## 3. Azure Resource Plan
 
@@ -52,12 +52,12 @@ The deployment will use `environmentName = 'mcp'` and the existing `baseName = '
 | Azure Cosmos DB for NoSQL | IVR configuration, facility data, schedules, and call logs | New `EventSchedules` container added |
 | Azure Storage | Function runtime storage and prompt audio cache | Separate account for the MCP environment |
 | Azure Key Vault | Secrets that cannot use managed identity | RBAC authorization; no secrets committed to source control |
-| Azure OpenAI | GPT-4.1 classification and extraction | New deployment, subject to US Gov Virginia quota validation |
+| Azure OpenAI | gpt-5.6-terra classification and extraction | Deployed; DataZoneStandard SKU (Gov-only SKU name for gpt-5.x models) |
 | Azure AI Speech | Speech-to-text and text-to-speech | New isolated resource |
 | Application Insights | Function, MCP, portal, and simulator telemetry | Correlate calls and MCP requests by call ID and trace ID |
-| Bot Service and Teams registration | Deferred until simulator acceptance | Must use a separate app registration and messaging endpoint |
+| Bot Service and Teams channel (calling) | Deployed via Bicep for structural parity with `rg-ivr-teams` | Live Teams Phone System wiring (Resource Account, Calling Policy, phone number) still deferred until simulator acceptance |
 
-The first deployment must verify GPT-4.1 quota and regional availability before resource creation. A quota failure is a deployment blocker; it must not silently switch models or reuse the existing environment.
+The first deployment must verify gpt-5.6-terra quota and regional availability before resource creation. A quota failure is a deployment blocker; it must not silently switch models or reuse the existing environment.
 
 ## 4. MCP Server Design
 

@@ -44,7 +44,7 @@ services:
       - CognitiveServicesKey=${COGNITIVE_SERVICES_KEY:-}
       - AzureOpenAI__Endpoint=${AZURE_OPENAI_ENDPOINT:-}
       - AzureOpenAI__ApiKey=${AZURE_OPENAI_API_KEY:-}
-      - AzureOpenAI__DeploymentName=${AZURE_OPENAI_DEPLOYMENT:-gpt-45}
+      - AzureOpenAI__DeploymentName=${AZURE_OPENAI_DEPLOYMENT:-gpt-56-terra}
       - APPLICATIONINSIGHTS_CONNECTION_STRING=${APPINSIGHTS_CONNECTION_STRING:-}
     depends_on:
       azurite:
