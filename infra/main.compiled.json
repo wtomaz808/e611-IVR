@@ -5,8 +5,8 @@
   "metadata": {
     "_generator": {
       "name": "bicep",
-      "version": "0.46.1.21595",
-      "templateHash": "15043962565117369599"
+      "version": "0.41.2.15936",
+      "templateHash": "10206679810724436379"
     }
   },
   "parameters": {
@@ -127,8 +127,8 @@
           "metadata": {
             "_generator": {
               "name": "bicep",
-              "version": "0.46.1.21595",
-              "templateHash": "378286521123184646"
+              "version": "0.41.2.15936",
+              "templateHash": "15634709842386290786"
             }
           },
           "parameters": {
@@ -639,8 +639,8 @@
           "metadata": {
             "_generator": {
               "name": "bicep",
-              "version": "0.46.1.21595",
-              "templateHash": "17076559208517097709"
+              "version": "0.41.2.15936",
+              "templateHash": "12871313035883686399"
             }
           },
           "parameters": {
@@ -755,8 +755,8 @@
           "metadata": {
             "_generator": {
               "name": "bicep",
-              "version": "0.46.1.21595",
-              "templateHash": "772273362958886455"
+              "version": "0.41.2.15936",
+              "templateHash": "3493102498229405993"
             }
           },
           "parameters": {
@@ -881,8 +881,8 @@
           "metadata": {
             "_generator": {
               "name": "bicep",
-              "version": "0.46.1.21595",
-              "templateHash": "6690506392702627008"
+              "version": "0.41.2.15936",
+              "templateHash": "7326438419434912785"
             }
           },
           "parameters": {
@@ -913,7 +913,7 @@
             "microsoftAppTenantId": {
               "type": "string",
               "metadata": {
-                "description": "Entra tenant ID (retained for azurebot kind upgrade path)"
+                "description": "Entra tenant ID the bot App Registration belongs to (required for SingleTenant msaAppType)"
               }
             },
             "messagingEndpoint": {
@@ -937,6 +937,9 @@
               }
             }
           },
+          "variables": {
+            "isGovCloud": "[equals(environment().name, 'AzureUSGovernment')]"
+          },
           "resources": [
             {
               "type": "Microsoft.BotService/botServices",
@@ -953,6 +956,8 @@
                 "description": "[parameters('botDescription')]",
                 "endpoint": "[parameters('messagingEndpoint')]",
                 "msaAppId": "[parameters('microsoftAppId')]",
+                "msaAppType": "SingleTenant",
+                "msaAppTenantId": "[parameters('microsoftAppTenantId')]",
                 "isStreamingSupported": false
               }
             },
@@ -963,11 +968,7 @@
               "location": "global",
               "properties": {
                 "channelName": "MsTeamsChannel",
-                "properties": {
-                  "enableCalling": true,
-                  "callingWebhook": "[parameters('messagingEndpoint')]",
-                  "isEnabled": true
-                }
+                "properties": "[union(createObject('acceptedTerms', true(), 'enableCalling', true(), 'callingWebhook', parameters('messagingEndpoint'), 'incomingCallRoute', 'graphPma', 'isTeamsIvrEnabled', false(), 'isEnabled', true()), if(variables('isGovCloud'), createObject('deploymentEnvironment', 'GCCHighDeployment'), createObject()))]"
               },
               "dependsOn": [
                 "[resourceId('Microsoft.BotService/botServices', parameters('name'))]"
@@ -1037,8 +1038,8 @@
           "metadata": {
             "_generator": {
               "name": "bicep",
-              "version": "0.46.1.21595",
-              "templateHash": "17630746150431212319"
+              "version": "0.41.2.15936",
+              "templateHash": "7545151450688242337"
             }
           },
           "parameters": {
@@ -1117,16 +1118,16 @@
             "value": "[variables('tags')]"
           },
           "deploymentName": {
-            "value": "gpt-41"
+            "value": "gpt-56-terra"
           },
           "modelName": {
-            "value": "gpt-4.1"
+            "value": "gpt-5.6-terra"
           },
           "modelVersion": {
-            "value": "2025-04-14"
+            "value": "2026-07-09"
           },
           "deploymentSku": {
-            "value": "Standard"
+            "value": "DataZoneStandard"
           }
         },
         "template": {
@@ -1136,8 +1137,8 @@
           "metadata": {
             "_generator": {
               "name": "bicep",
-              "version": "0.46.1.21595",
-              "templateHash": "2897135740102664406"
+              "version": "0.41.2.15936",
+              "templateHash": "11912258233792249016"
             }
           },
           "parameters": {
@@ -1161,30 +1162,30 @@
             },
             "deploymentName": {
               "type": "string",
-              "defaultValue": "gpt-41",
+              "defaultValue": "gpt-56-terra",
               "metadata": {
                 "description": "OpenAI model deployment name"
               }
             },
             "modelName": {
               "type": "string",
-              "defaultValue": "gpt-4.1",
+              "defaultValue": "gpt-5.6-terra",
               "metadata": {
                 "description": "OpenAI model name"
               }
             },
             "modelVersion": {
               "type": "string",
-              "defaultValue": "2025-04-14",
+              "defaultValue": "2026-07-09",
               "metadata": {
                 "description": "OpenAI model version"
               }
             },
             "deploymentSku": {
               "type": "string",
-              "defaultValue": "GlobalStandard",
+              "defaultValue": "DataZoneStandard",
               "metadata": {
-                "description": "Deployment SKU — Standard for gpt-4.x, GlobalStandard for gpt-5.x"
+                "description": "Deployment SKU. Azure Government only exposes DataZoneStandard for gpt-5.x models (Standard/GlobalStandard are commercial-cloud-only names); gpt-4.x supports Standard in both clouds."
               }
             }
           },
@@ -1276,8 +1277,8 @@
           "metadata": {
             "_generator": {
               "name": "bicep",
-              "version": "0.46.1.21595",
-              "templateHash": "4824281340454389479"
+              "version": "0.41.2.15936",
+              "templateHash": "13062448025539651021"
             }
           },
           "parameters": {
@@ -1390,8 +1391,8 @@
           "metadata": {
             "_generator": {
               "name": "bicep",
-              "version": "0.46.1.21595",
-              "templateHash": "306009057421689318"
+              "version": "0.41.2.15936",
+              "templateHash": "12798328354734642038"
             }
           },
           "parameters": {
@@ -1613,8 +1614,8 @@
           "metadata": {
             "_generator": {
               "name": "bicep",
-              "version": "0.46.1.21595",
-              "templateHash": "15510193250912583857"
+              "version": "0.41.2.15936",
+              "templateHash": "5657341163628453511"
             }
           },
           "parameters": {
@@ -1974,8 +1975,8 @@
           "metadata": {
             "_generator": {
               "name": "bicep",
-              "version": "0.46.1.21595",
-              "templateHash": "12577758747235952276"
+              "version": "0.41.2.15936",
+              "templateHash": "14485651722900781706"
             }
           },
           "parameters": {
@@ -2162,8 +2163,8 @@
           "metadata": {
             "_generator": {
               "name": "bicep",
-              "version": "0.46.1.21595",
-              "templateHash": "15644053227114007850"
+              "version": "0.41.2.15936",
+              "templateHash": "10368823363133910461"
             }
           },
           "parameters": {
@@ -2244,8 +2245,8 @@
           "metadata": {
             "_generator": {
               "name": "bicep",
-              "version": "0.46.1.21595",
-              "templateHash": "2182200260844763722"
+              "version": "0.41.2.15936",
+              "templateHash": "2947749075069314584"
             }
           },
           "parameters": {

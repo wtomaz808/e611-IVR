@@ -105,19 +105,26 @@ module cognitiveServices 'modules/cognitive-services.bicep' = {
 }
 
 // ─── Azure OpenAI (Transcript Intent Classification) ────────────
-// gpt-5.1 (2025-11-13) is registered in usgovvirginia but has no SKUs
-// configured — cannot be deployed via API. Using gpt-4.1 (2025-04-14)
-// which is confirmed available. Re-check gpt-5.1 availability with your
-// MSFT team (may require provisioned throughput or special approval).
+// gpt-4.1 is now Legacy in the model catalog. Upgraded to gpt-5.6-terra
+// (GA, 2026-07-09) — the balanced/production tier of the 5.6 series;
+// chosen over sol (flagship, costlier/higher-latency, unnecessary for
+// closed-set intent classification) and luna (cheapest/high-throughput
+// tier, lower accuracy ceiling for a safety-relevant call-routing
+// decision). o3-mini and gpt-5.1 were also available but rejected:
+// o3-mini is Deprecating (retires 2026-11-19) and is a reasoning model
+// (added latency, poor fit for the live-call path); gpt-5.1 is GA but
+// the previous generation with a shorter support runway than 5.6.
+// NOTE: gpt-5.x models in Azure Government only expose the
+// DataZoneStandard SKU (not Standard/GlobalStandard).
 module openAI 'modules/openai.bicep' = {
   params: {
     name: '${namePrefix}-openai-${uniqueSuffix}'
     location: location
     tags: tags
-    deploymentName: 'gpt-41'
-    modelName: 'gpt-4.1'
-    modelVersion: '2025-04-14'
-    deploymentSku: 'Standard'
+    deploymentName: 'gpt-56-terra'
+    modelName: 'gpt-5.6-terra'
+    modelVersion: '2026-07-09'
+    deploymentSku: 'DataZoneStandard'
   }
 }
 

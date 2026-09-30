@@ -12,16 +12,16 @@ param location string
 param tags object
 
 @description('OpenAI model deployment name')
-param deploymentName string = 'gpt-41'
+param deploymentName string = 'gpt-56-terra'
 
 @description('OpenAI model name')
-param modelName string = 'gpt-4.1'
+param modelName string = 'gpt-5.6-terra'
 
 @description('OpenAI model version')
-param modelVersion string = '2025-04-14'
+param modelVersion string = '2026-07-09'
 
-@description('Deployment SKU — Standard for gpt-4.x, GlobalStandard for gpt-5.x')
-param deploymentSku string = 'GlobalStandard'
+@description('Deployment SKU. Azure Government only exposes DataZoneStandard for gpt-5.x models (Standard/GlobalStandard are commercial-cloud-only names); gpt-4.x supports Standard in both clouds.')
+param deploymentSku string = 'DataZoneStandard'
 
 resource openAIAccount 'Microsoft.CognitiveServices/accounts@2023-10-01-preview' = {
   name: name
